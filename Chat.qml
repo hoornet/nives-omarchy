@@ -265,7 +265,7 @@ Item {
               id: urlField
               width: parent.width
               text: root.svc ? String(root.svc.config.baseUrl || "") : ""
-              placeholderText: "http://homeassistant.local:8123"
+              placeholderText: "http://homeassistant.local — older installs add :8123"
               onAccepted: agentField.forceActiveFocus()
               Keys.onEscapePressed: root.dismiss()
             }

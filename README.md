@@ -52,9 +52,11 @@ Optionally, add it to the Omarchy menu in
 1. In Home Assistant, open your **profile page** (your name, bottom of the
    sidebar) → **Security** → create a **long-lived access token**.
 2. Open the chat (keybinding or bar icon) → **Settings**.
-3. Enter your Home Assistant address (e.g. `http://homeassistant.local:8123`),
-   paste the token, and — optionally — a conversation agent id. Leave the
-   agent empty to use whatever Assist agent is your Home Assistant default.
+3. Enter your Home Assistant address, paste the token, and — optionally — a
+   conversation agent id. Leave the agent empty to use whatever Assist agent
+   is your Home Assistant default. New Home Assistant OS installs (2026.8+)
+   live at plain `http://homeassistant.local`; older and Container installs
+   typically add the classic port, `http://homeassistant.local:8123`.
 4. **Save & connect.** Ask your house something.
 
 ### Picking the agent
