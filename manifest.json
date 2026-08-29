@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.hoornet.nives",
+  "name": "Nives for Omarchy",
+  "version": "0.1.0",
+  "author": "Jure (hoornet)",
+  "license": "MIT",
+  "description": "Talk to your Home Assistant house in plain language. A chat overlay for any Assist conversation agent — ask questions, control devices, create automations.",
+  "kinds": [
+    "service",
+    "bar-widget",
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "barWidget": "BarWidget.qml",
+    "overlay": "Chat.qml"
+  },
+  "barWidget": {
+    "displayName": "Nives",
+    "description": "A snow crystal that opens the Nives chat overlay.",
+    "category": "Home",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
