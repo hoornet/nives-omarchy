@@ -1,0 +1,11 @@
+# Local agent/tool state. These get created in whatever directory a session
+# runs from, and they carry absolute developer paths and session ids — which is
+# exactly the sort of thing that must not end up in a published repo.
+.omc/
+.claude/settings.local.json
+
+# Never, under any circumstances
+.env
+.env.*
+*.pem
+*.key
