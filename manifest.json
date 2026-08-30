@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.hoornet.nives",
   "name": "Nives for Omarchy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Jure (hoornet)",
   "license": "MIT",
   "description": "Talk to your Home Assistant house in plain language. A chat overlay for any Assist conversation agent — ask questions, control devices, create automations.",

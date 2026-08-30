@@ -23,6 +23,10 @@ Item {
   property bool opened: false
   property bool settingsOpen: false
 
+  // Agent chosen in the settings pane but not yet saved. Seeded from the
+  // service each time settings opens so cancelling changes nothing.
+  property string pickedAgent: ""
+
   // Shares the [menu] surface tokens — themes that style the menu also style
   // this card.
   property color background: Color.menu.background
@@ -48,6 +52,7 @@ Item {
   function open(payloadJson) {
     root.opened = true
     if (root.svc && !root.svc.configured) root.settingsOpen = true
+    if (root.svc) root.pickedAgent = root.svc.agentId
     root.focusInput()
   }
 
@@ -84,10 +89,20 @@ Item {
 
   function saveSettings() {
     if (!root.svc) return
+    var langs = []
+    var parts = langField.text.split(",")
+    for (var i = 0; i < parts.length; i++) {
+      var code = parts[i].trim()
+      if (code) langs.push(code)
+    }
     root.svc.applyConfig({
       baseUrl: urlField.text.trim(),
-      agentId: agentField.text.trim()
+      agentId: root.pickedAgent,
+      languages: langs.length ? langs : ["en"]
     })
+    // A language that just disappeared from the list must not stay selected.
+    if (root.svc.languages.indexOf(root.svc.activeLanguage) < 0)
+      root.svc.language = root.svc.languages[0]
     var token = tokenField.text.trim()
     if (token) {
       // applyConfig above may have changed baseUrl; store against the fresh one.
@@ -173,7 +188,39 @@ Item {
               font.pixelSize: Style.font.body
               anchors.verticalCenter: parent.verticalCenter
               elide: Text.ElideRight
-              width: Math.min(implicitWidth, card.width * 0.45)
+              width: Math.min(implicitWidth, card.width * 0.32)
+            }
+
+            // Which language this conversation is in — the one thing you
+            // otherwise have to guess at in a bilingual house. Click to switch;
+            // it is sent with every message rather than left to inference.
+            Rectangle {
+              width: langLabel.implicitWidth + Style.spacing.controlPaddingX * 1.6
+              height: header.height - Style.space(8)
+              radius: root.cornerRadius
+              anchors.verticalCenter: parent.verticalCenter
+              color: langArea.containsMouse ? root.accent : root.bubbleBackground
+              visible: root.svc && root.svc.languages.length > 1
+
+              Text {
+                id: langLabel
+                anchors.centerIn: parent
+                text: root.svc ? root.svc.activeLanguage.toUpperCase() : ""
+                color: langArea.containsMouse ? root.background : root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+              }
+
+              MouseArea {
+                id: langArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  if (root.svc) root.svc.cycleLanguage()
+                  root.focusInput()
+                }
+              }
             }
           }
 
@@ -234,6 +281,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
+                  if (!root.settingsOpen && root.svc) root.pickedAgent = root.svc.agentId
                   root.settingsOpen = !root.settingsOpen
                   root.focusInput()
                 }
@@ -288,7 +336,70 @@ Item {
             }
 
             Text {
-              text: "Conversation agent id (optional — empty uses the default Assist agent)"
+              text: "Which agent answers you"
+              color: root.foreground
+              opacity: 0.7
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+
+            // Picking from what the house actually offers, rather than typing
+            // an entity id. Leaving it on "Default" is how you end up talking
+            // to Home Assistant's built-in intent matcher — which answers
+            // "sorry, I couldn't understand" to anything conversational.
+            Flow {
+              width: parent.width
+              spacing: Style.spacing.sm
+              visible: root.svc && root.svc.agents.length > 0
+
+              Repeater {
+                model: root.svc ? root.svc.agents : []
+
+                Rectangle {
+                  required property var modelData
+                  readonly property bool picked: root.pickedAgent === modelData.id
+
+                  width: chipText.implicitWidth + Style.spacing.controlPaddingX * 2
+                  height: Style.space(30)
+                  radius: root.cornerRadius
+                  color: picked ? root.accent : (chipArea.containsMouse ? root.bubbleBackground : "transparent")
+                  border.width: picked ? 0 : 1
+                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                  Text {
+                    id: chipText
+                    anchors.centerIn: parent
+                    text: modelData.name
+                    color: parent.picked ? root.background : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  MouseArea {
+                    id: chipArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.pickedAgent = modelData.id
+                  }
+                }
+              }
+            }
+
+            Text {
+              text: root.svc && root.svc.agents.length > 0
+                ? "" : "Connect first and the agents in your house will be listed here."
+              visible: text !== ""
+              color: root.foreground
+              opacity: 0.5
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              wrapMode: Text.Wrap
+              width: parent.width
+            }
+
+            Text {
+              text: "Languages you speak (comma-separated — switch between them from the header)"
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
@@ -296,10 +407,10 @@ Item {
             }
 
             TextField {
-              id: agentField
+              id: langField
               width: parent.width
-              text: root.svc ? String(root.svc.config.agentId || "") : ""
-              placeholderText: "conversation.nives"
+              text: root.svc ? root.svc.languages.join(", ") : ""
+              placeholderText: "en, sl"
               onAccepted: root.saveSettings()
               Keys.onEscapePressed: root.dismiss()
             }
@@ -404,7 +515,8 @@ Item {
 
                 Text {
                   text: root.svc && root.svc.ready
-                    ? "Ask your house anything."
+                    ? "Ask your house anything.\n" + root.svc.agentName
+                      + " is answering, in " + root.svc.activeLanguage.toUpperCase() + "."
                     : "Open Settings to connect to Home Assistant."
                   color: root.foreground
                   opacity: 0.6

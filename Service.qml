@@ -26,6 +26,20 @@ Item {
   readonly property string agentId: String(config.agentId || "")
   readonly property bool configured: baseUrl !== ""
 
+  // Languages offered in the header switch. Home Assistant is told which one
+  // each message is in, so a bilingual house can stop guessing: the reply comes
+  // back in the language showing on the chip, not the one the agent inferred.
+  readonly property var languages: (config.languages && config.languages.length)
+    ? config.languages : ["en"]
+  property string language: ""
+  readonly property string activeLanguage: root.language || root.languages[0]
+
+  function cycleLanguage() {
+    var list = root.languages
+    var at = list.indexOf(root.activeLanguage)
+    root.language = list[(at + 1 + list.length) % list.length]
+  }
+
   function normalizeOrigin(raw) {
     var url = String(raw || "").trim()
     if (!url) return ""
@@ -34,13 +48,21 @@ Item {
   }
 
   function parseConfig(text) {
-    var out = { baseUrl: "", agentId: "" }
+    var out = { baseUrl: "", agentId: "", languages: ["en"] }
     if (!text) return out
     try {
       var parsed = JSON.parse(text)
       if (parsed && typeof parsed === "object") {
         if (typeof parsed.baseUrl === "string") out.baseUrl = parsed.baseUrl
         if (typeof parsed.agentId === "string") out.agentId = parsed.agentId
+        if (Array.isArray(parsed.languages)) {
+          var clean = []
+          for (var i = 0; i < parsed.languages.length; i++) {
+            var code = String(parsed.languages[i] || "").trim()
+            if (code) clean.push(code)
+          }
+          if (clean.length) out.languages = clean
+        }
       }
     } catch (e) {
       out.error = "Could not read config.json — fix or delete " + root.configPath
@@ -49,7 +71,11 @@ Item {
   }
 
   function applyConfig(patch) {
-    var next = { baseUrl: root.config.baseUrl, agentId: root.config.agentId }
+    var next = {
+      baseUrl: root.config.baseUrl,
+      agentId: root.config.agentId,
+      languages: root.config.languages
+    }
     for (var key in patch) next[key] = patch[key]
     root.config = next
     configFile.setText(JSON.stringify(next, null, 2) + "\n")
@@ -106,7 +132,7 @@ Item {
     root.transcript.append({ role: "assistant", text: "", pending: true, error: false })
     root.busy = true
 
-    var body = { text: line }
+    var body = { text: line, language: root.activeLanguage }
     if (root.conversationId) body.conversation_id = root.conversationId
     if (root.agentId) body.agent_id = root.agentId
 
@@ -160,6 +186,46 @@ Item {
     root.phase = "error"
   }
 
+  // --- agent discovery ----------------------------------------------------
+
+  // Every conversation agent the house exposes, so the settings pane can offer
+  // a choice instead of asking the user to know an entity id. An empty agent
+  // means "whatever Home Assistant defaults to", which is how you end up
+  // talking to the built-in intent matcher without realising it.
+  property var agents: []
+
+  readonly property string agentName: {
+    for (var i = 0; i < root.agents.length; i++)
+      if (root.agents[i].id === root.agentId) return root.agents[i].name
+    return root.agentId ? root.agentId : "Default agent"
+  }
+
+  function loadAgents() {
+    if (!root.baseUrl || !root.token) return
+    var xhr = new XMLHttpRequest()
+    xhr.open("GET", root.baseUrl + "/api/states")
+    xhr.setRequestHeader("Authorization", "Bearer " + root.token)
+    xhr.timeout = 15000
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== XMLHttpRequest.DONE) return
+      if (xhr.status < 200 || xhr.status >= 300) return
+      var found = []
+      try {
+        var states = JSON.parse(xhr.responseText || "[]")
+        for (var i = 0; i < states.length; i++) {
+          var id = String(states[i].entity_id || "")
+          if (id.indexOf("conversation.") !== 0) continue
+          var attrs = states[i].attributes || {}
+          found.push({ id: id, name: String(attrs.friendly_name || id) })
+        }
+      } catch (e) {
+        return
+      }
+      root.agents = found
+    }
+    xhr.send()
+  }
+
   // A cheap authenticated probe so the bar dot and the overlay status line can
   // say "connected" before the first message is ever sent.
   function checkConnection() {
@@ -174,6 +240,7 @@ Item {
       if (xhr.status >= 200 && xhr.status < 300) {
         root.phase = "ready"
         root.lastError = ""
+        root.loadAgents()
       } else {
         root.fail(root.statusMessage(xhr.status))
       }

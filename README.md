@@ -52,20 +52,25 @@ Optionally, add it to the Omarchy menu in
 1. In Home Assistant, open your **profile page** (your name, bottom of the
    sidebar) → **Security** → create a **long-lived access token**.
 2. Open the chat (keybinding or bar icon) → **Settings**.
-3. Enter your Home Assistant address, paste the token, and — optionally — a
-   conversation agent id. Leave the agent empty to use whatever Assist agent
-   is your Home Assistant default. New Home Assistant OS installs (2026.8+)
-   live at plain `http://homeassistant.local`; older and Container installs
-   typically add the classic port, `http://homeassistant.local:8123`.
+3. Enter your Home Assistant address and paste the token. New Home Assistant OS
+   installs (2026.8+) live at plain `http://homeassistant.local`; older and
+   Container installs typically add the classic port,
+   `http://homeassistant.local:8123`.
+4. Once connected, the agents in your house are listed — **pick the one that
+   should answer you**. This matters: left on the default, Home Assistant sends
+   your messages to its built-in intent matcher, which replies "sorry, I
+   couldn't understand" to anything conversational.
+5. If you speak more than one language, list them (e.g. `en, sl`). A chip in
+   the header shows which language the conversation is in, and clicking it
+   switches — so you always know, rather than guessing from the reply.
 4. **Save & connect.** Ask your house something.
 
-### Picking the agent
+### Which language am I in?
 
-With no agent id set, Home Assistant routes your messages to its default
-conversation agent. To talk to a specific agent (say, Nives or home-mind),
-either make it the default in **Settings → Voice assistants**, or find its id
-under **Developer tools → States** (it looks like `conversation.something`)
-and paste it into this plugin's settings.
+The header shows a language chip — `EN`, `SL` — for the language the plugin
+tells Home Assistant each message is in. Click it to switch. Nives replies in
+whatever language you actually write, so the chip is mostly there to tell you
+where you stand, and it is what a spoken request would be transcribed as.
 
 ## Notes
 
