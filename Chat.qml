@@ -3,6 +3,7 @@ import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
+import "Strings.js" as Strings
 
 // The chat overlay: a summoned card holding one running conversation with the
 // Home Assistant Assist agent. The layer-shell window and its exclusive
@@ -50,20 +51,23 @@ Item {
   readonly property int topInset: Style.bar.sizeHorizontal + Style.gapsOut * 2
   readonly property int sideInset: Style.gapsOut * 2
 
+  // Every visible word follows the language chip, not the other way round.
+  readonly property string uiLang: root.svc ? root.svc.activeLanguage : "en"
+
   readonly property string micHint: {
-    if (!root.svc) return "Message your house…"
-    if (root.svc.recording) return "Listening… click the microphone when you're done"
-    if (root.svc.transcribing) return "Working out what you said…"
-    if (root.svc.busy) return "Waiting for the answer…"
+    if (!root.svc) return Strings.t(root.uiLang, "inputPlaceholder")
+    if (root.svc.recording) return Strings.t(root.uiLang, "listening")
+    if (root.svc.transcribing) return Strings.t(root.uiLang, "transcribing")
+    if (root.svc.busy) return Strings.t(root.uiLang, "waiting")
     if (root.svc.listenError) return root.svc.listenError
-    return "Message your house…"
+    return Strings.t(root.uiLang, "inputPlaceholder")
   }
 
-  readonly property string statusText: !root.svc ? "Service not loaded — re-enable the plugin"
-    : root.svc.phase === "ready" ? "Connected"
-    : root.svc.phase === "connecting" ? "Connecting…"
+  readonly property string statusText: !root.svc ? Strings.t(root.uiLang, "serviceMissing")
+    : root.svc.phase === "ready" ? Strings.t(root.uiLang, "connected")
+    : root.svc.phase === "connecting" ? Strings.t(root.uiLang, "connecting")
     : root.svc.phase === "error" ? root.svc.lastError
-    : "Not configured"
+    : Strings.t(root.uiLang, "notConfigured")
 
   function open(payloadJson) {
     root.opened = true
@@ -264,7 +268,7 @@ Item {
               Text {
                 id: newChatLabel
                 anchors.centerIn: parent
-                text: "New chat"
+                text: Strings.t(root.uiLang, "newChat")
                 color: root.foreground
                 opacity: 0.8
                 font.family: root.fontFamily
@@ -293,7 +297,7 @@ Item {
               Text {
                 id: gearLabel
                 anchors.centerIn: parent
-                text: "Settings"
+                text: Strings.t(root.uiLang, "settings")
                 color: root.foreground
                 opacity: 0.8
                 font.family: root.fontFamily
@@ -327,7 +331,7 @@ Item {
             visible: root.settingsOpen
 
             Text {
-              text: "Home Assistant address"
+              text: Strings.t(root.uiLang, "addressLabel")
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
@@ -338,13 +342,13 @@ Item {
               id: urlField
               width: parent.width
               text: root.svc ? String(root.svc.config.baseUrl || "") : ""
-              placeholderText: "http://homeassistant.local — older installs add :8123"
+              placeholderText: Strings.t(root.uiLang, "addressPlaceholder")
               onAccepted: agentField.forceActiveFocus()
               Keys.onEscapePressed: root.dismiss()
             }
 
             Text {
-              text: "Long-lived access token (stored in your system keyring)"
+              text: Strings.t(root.uiLang, "tokenLabel")
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
@@ -355,13 +359,13 @@ Item {
               id: tokenField
               width: parent.width
               password: true
-              placeholderText: root.svc && root.svc.token ? "•••••• (already stored — paste to replace)" : "Paste a token from your HA profile page"
+              placeholderText: root.svc && root.svc.token ? Strings.t(root.uiLang, "tokenStored") : Strings.t(root.uiLang, "tokenPlaceholder")
               onAccepted: root.saveSettings()
               Keys.onEscapePressed: root.dismiss()
             }
 
             Text {
-              text: "Which agent answers you"
+              text: Strings.t(root.uiLang, "agentLabel")
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
@@ -413,7 +417,7 @@ Item {
 
             Text {
               text: root.svc && root.svc.agents.length > 0
-                ? "" : "Connect first and the agents in your house will be listed here."
+                ? "" : Strings.t(root.uiLang, "agentEmpty")
               visible: text !== ""
               color: root.foreground
               opacity: 0.5
@@ -424,7 +428,7 @@ Item {
             }
 
             Text {
-              text: "Speaking (optional — which engine transcribes you)"
+              text: Strings.t(root.uiLang, "sttLabel")
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
@@ -437,7 +441,7 @@ Item {
               visible: root.svc && root.svc.sttEngines.length > 0
 
               Repeater {
-                model: root.svc ? [{id: "", name: "Off"}].concat(root.svc.sttEngines) : []
+                model: root.svc ? [{id: "", name: Strings.t(root.uiLang, "sttOff")}].concat(root.svc.sttEngines) : []
 
                 Rectangle {
                   required property var modelData
@@ -471,7 +475,7 @@ Item {
             }
 
             Text {
-              text: "Languages you speak (comma-separated — switch between them from the header)"
+              text: Strings.t(root.uiLang, "languagesLabel")
               color: root.foreground
               opacity: 0.7
               font.family: root.fontFamily
@@ -498,7 +502,7 @@ Item {
               Text {
                 id: saveLabel
                 anchors.centerIn: parent
-                text: "Save & connect"
+                text: Strings.t(root.uiLang, "save")
                 color: saveArea.containsMouse ? root.background : root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
@@ -587,9 +591,10 @@ Item {
 
                 Text {
                   text: root.svc && root.svc.ready
-                    ? "Ask your house anything.\n" + root.svc.agentName
-                      + " is answering, in " + root.svc.activeLanguage.toUpperCase() + "."
-                    : "Open Settings to connect to Home Assistant."
+                    ? Strings.t(root.uiLang, "emptyPrompt") + "\n"
+                      + Strings.f(root.uiLang, "emptyAnswering", root.svc.agentName,
+                                  root.svc.activeLanguage.toUpperCase())
+                    : Strings.t(root.uiLang, "emptyConnect")
                   color: root.foreground
                   opacity: 0.6
                   font.family: root.fontFamily

@@ -88,6 +88,11 @@ tells Home Assistant each message is in. Click it to switch. Nives replies in
 whatever language you actually write, so the chip is mostly there to tell you
 where you stand, and it is what a spoken request would be transcribed as.
 
+**The panel follows the chip.** Switch to `SL` and the interface is in
+Slovenian too. English and Slovenian ship with the plugin; any other language
+you list still works, it just reads in English until someone adds it. Adding
+one means adding a block to [`Strings.js`](Strings.js) — nothing else.
+
 ## Notes
 
 - The overlay keeps the conversation while closed; **New chat** starts fresh.
