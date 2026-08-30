@@ -30,6 +30,7 @@ Item {
   // service each time settings opens so cancelling changes nothing.
   property string pickedAgent: ""
   property string pickedStt: ""
+  property var pickedAutoSend: []
 
   // Shares the [menu] surface tokens — themes that style the menu also style
   // this card.
@@ -72,7 +73,7 @@ Item {
   function open(payloadJson) {
     root.opened = true
     if (root.svc && !root.svc.configured) root.settingsOpen = true
-    if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity }
+    if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice() }
     root.focusInput()
   }
 
@@ -98,16 +99,16 @@ Item {
     })
   }
 
-  // Speaking should end with an answer, not with a button. The transcript is
-  // still shown — it becomes your message in the conversation above — so a
-  // misheard sentence is visible either way; making you approve every one of
-  // them just put a click between you and your house.
+  // Whether speech sends itself is decided per language, because the answer
+  // differs per language: where transcription is reliable, an approval step is
+  // pure friction; where it is not, sending a garbled sentence only spends a
+  // round-trip being misunderstood. Either way the words land in the box.
   Connections {
     target: root.svc
     ignoreUnknownSignals: true
     function onTranscribed(text) {
       input.text = text
-      root.sendCurrent()
+      if (root.svc && root.svc.autoSendActive) root.sendCurrent()
       root.focusInput()
     }
   }
@@ -133,6 +134,7 @@ Item {
       baseUrl: urlField.text.trim(),
       agentId: root.pickedAgent,
       sttEntity: root.pickedStt,
+      autoSendLanguages: root.pickedAutoSend,
       languages: langs.length ? langs : ["en"]
     })
     // A language that just disappeared from the list must not stay selected.
@@ -312,7 +314,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                  if (!root.settingsOpen && root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity }
+                  if (!root.settingsOpen && root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice() }
                   root.settingsOpen = !root.settingsOpen
                   root.focusInput()
                 }
@@ -471,6 +473,58 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.pickedStt = modelData.id
+                  }
+                }
+              }
+            }
+
+            Text {
+              text: Strings.t(root.uiLang, "autoSendLabel")
+              color: root.foreground
+              opacity: 0.7
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+
+            Flow {
+              width: parent.width
+              spacing: Style.spacing.sm
+
+              Repeater {
+                model: root.svc ? root.svc.languages : []
+
+                Rectangle {
+                  required property var modelData
+                  readonly property bool picked: root.pickedAutoSend.indexOf(modelData) >= 0
+
+                  width: autoChipText.implicitWidth + Style.spacing.controlPaddingX * 2
+                  height: Style.space(30)
+                  radius: root.cornerRadius
+                  color: picked ? root.accent : (autoChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                  border.width: picked ? 0 : 1
+                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                  Text {
+                    id: autoChipText
+                    anchors.centerIn: parent
+                    text: modelData.toUpperCase()
+                    color: parent.picked ? root.background : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  MouseArea {
+                    id: autoChipArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                      var next = root.pickedAutoSend.slice()
+                      var at = next.indexOf(modelData)
+                      if (at >= 0) next.splice(at, 1)
+                      else next.push(modelData)
+                      root.pickedAutoSend = next
+                    }
                   }
                 }
               }

@@ -34,6 +34,14 @@ Item {
   property string language: ""
   readonly property string activeLanguage: root.language || root.languages[0]
 
+  // Languages whose transcripts are trusted enough to send without a look.
+  // Not a preference so much as a measurement: where transcription is reliable
+  // the review step is friction, and where it is not, sending a garbled
+  // sentence just spends a round-trip to be misunderstood.
+  readonly property var autoSendLanguages: config.autoSendLanguages || []
+  readonly property bool autoSendActive:
+    root.autoSendLanguages.indexOf(root.activeLanguage) >= 0
+
   function cycleLanguage() {
     var list = root.languages
     var at = list.indexOf(root.activeLanguage)
@@ -48,7 +56,7 @@ Item {
   }
 
   function parseConfig(text) {
-    var out = { baseUrl: "", agentId: "", sttEntity: "", languages: ["en"] }
+    var out = { baseUrl: "", agentId: "", sttEntity: "", languages: ["en"], autoSendLanguages: ["en"] }
     if (!text) return out
     try {
       var parsed = JSON.parse(text)
@@ -56,6 +64,14 @@ Item {
         if (typeof parsed.baseUrl === "string") out.baseUrl = parsed.baseUrl
         if (typeof parsed.agentId === "string") out.agentId = parsed.agentId
         if (typeof parsed.sttEntity === "string") out.sttEntity = parsed.sttEntity
+        if (Array.isArray(parsed.autoSendLanguages)) {
+          var auto = []
+          for (var a = 0; a < parsed.autoSendLanguages.length; a++) {
+            var ac = String(parsed.autoSendLanguages[a] || "").trim()
+            if (ac) auto.push(ac)
+          }
+          out.autoSendLanguages = auto
+        }
         if (Array.isArray(parsed.languages)) {
           var clean = []
           for (var i = 0; i < parsed.languages.length; i++) {
@@ -76,7 +92,8 @@ Item {
       baseUrl: root.config.baseUrl,
       agentId: root.config.agentId,
       sttEntity: root.config.sttEntity,
-      languages: root.config.languages
+      languages: root.config.languages,
+      autoSendLanguages: root.config.autoSendLanguages
     }
     for (var key in patch) next[key] = patch[key]
     root.config = next

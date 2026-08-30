@@ -39,6 +39,7 @@ var TABLE = {
     sttLabel: "Speaking (optional — which engine transcribes you)",
     sttOff: "Off",
     languagesLabel: "Languages you speak (comma-separated — switch between them from the header)",
+    autoSendLabel: "Send spoken messages straight away in these languages (others wait for you to read them first)",
     save: "Save & connect"
   },
 
@@ -70,6 +71,7 @@ var TABLE = {
     sttLabel: "Govor (izbirno — kateri pogon te prepisuje)",
     sttOff: "Izklopljeno",
     languagesLabel: "Jeziki, ki jih govoriš (ločeni z vejico — med njimi preklapljaš zgoraj)",
+    autoSendLabel: "Izgovorjeno pošlji takoj v teh jezikih (v ostalih počaka, da ga prebereš)",
     save: "Shrani in poveži"
   }
 };
