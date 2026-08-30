@@ -56,7 +56,8 @@ Item {
   }
 
   function parseConfig(text) {
-    var out = { baseUrl: "", agentId: "", sttEntity: "", micSource: "", languages: ["en"], autoSendLanguages: ["en"] }
+    var out = { baseUrl: "", agentId: "", sttEntity: "", micSource: "", languages: ["en"],
+                autoSendLanguages: ["en"], ttsEntities: {} }
     if (!text) return out
     try {
       var parsed = JSON.parse(text)
@@ -65,6 +66,14 @@ Item {
         if (typeof parsed.agentId === "string") out.agentId = parsed.agentId
         if (typeof parsed.sttEntity === "string") out.sttEntity = parsed.sttEntity
         if (typeof parsed.micSource === "string") out.micSource = parsed.micSource
+        if (parsed.ttsEntities && typeof parsed.ttsEntities === "object") {
+          var voices = {}
+          for (var lang in parsed.ttsEntities) {
+            var ent = String(parsed.ttsEntities[lang] || "").trim()
+            if (ent) voices[lang] = ent
+          }
+          out.ttsEntities = voices
+        }
         if (Array.isArray(parsed.autoSendLanguages)) {
           var auto = []
           for (var a = 0; a < parsed.autoSendLanguages.length; a++) {
@@ -94,6 +103,7 @@ Item {
       agentId: root.config.agentId,
       sttEntity: root.config.sttEntity,
       micSource: root.config.micSource,
+      ttsEntities: root.config.ttsEntities,
       languages: root.config.languages,
       autoSendLanguages: root.config.autoSendLanguages
     }
@@ -153,6 +163,9 @@ Item {
     root.transcript.append({ role: "assistant", text: "", pending: true, error: false })
     root.busy = true
 
+    var speakIt = root.pendingSpeak
+    root.pendingSpeak = false
+
     var body = { text: line, language: root.activeLanguage }
     if (root.conversationId) body.conversation_id = root.conversationId
     if (root.agentId) body.agent_id = root.agentId
@@ -183,6 +196,7 @@ Item {
       var speech = root.speechOf(data)
       if (!speech) speech = isError ? "The agent reported an error without saying more." : "(no answer)"
       root.resolveReply(speech, isError)
+      if (speakIt && !isError) root.speak(speech)
       if (!isError) {
         root.phase = "ready"
         root.lastError = ""
@@ -239,6 +253,7 @@ Item {
       if (xhr.status < 200 || xhr.status >= 300) return
       var found = []
       var engines = []
+      var voices = []
       try {
         var states = JSON.parse(xhr.responseText || "[]")
         for (var i = 0; i < states.length; i++) {
@@ -247,12 +262,14 @@ Item {
           var entry = { id: id, name: String(attrs.friendly_name || id) }
           if (id.indexOf("conversation.") === 0) found.push(entry)
           else if (id.indexOf("stt.") === 0) engines.push(entry)
+          else if (id.indexOf("tts.") === 0) voices.push(entry)
         }
       } catch (e) {
         return
       }
       root.agents = found
       root.sttEngines = engines
+      root.ttsEngines = voices
     }
     xhr.send()
   }
@@ -447,6 +464,79 @@ Item {
     path: root.headerPath
     printErrors: false
     atomicWrites: true
+  }
+
+  // --- speaking back ------------------------------------------------------
+  //
+  // Home Assistant synthesises, exactly as it transcribes: the engine is one of
+  // the tts.* entities the house already has, so no key, no model and no cost
+  // belong to this plugin. The audio URL it hands back is signed and publicly
+  // fetchable, so the player streams it directly rather than staging a file.
+
+  property var ttsEngines: []
+  readonly property var ttsEntities: config.ttsEntities || ({})
+  readonly property string ttsEntity: String(root.ttsEntities[root.activeLanguage] || "")
+  readonly property bool canSpeak: root.ready && root.ttsEntity !== "" && root.player !== ""
+
+  property bool speaking: false
+  // Set by the caller when a request came from the microphone: speaking an
+  // answer to something you typed would read a paragraph at you when you
+  // wanted a glance.
+  property bool pendingSpeak: false
+
+  property string player: ""
+
+  property Process playerProbe: Process {
+    command: ["sh", "-c", "command -v mpv || command -v ffplay || true"]
+    running: true
+    stdout: SplitParser {
+      onRead: function(line) {
+        var p = String(line || "").trim()
+        if (p && !root.player) root.player = p
+      }
+    }
+  }
+
+  function speak(text) {
+    var line = String(text || "").trim()
+    if (!line || !root.canSpeak) return
+    var xhr = new XMLHttpRequest()
+    xhr.open("POST", root.baseUrl + "/api/tts_get_url")
+    xhr.setRequestHeader("Authorization", "Bearer " + root.token)
+    xhr.setRequestHeader("Content-Type", "application/json")
+    xhr.timeout = 60000
+    xhr.onreadystatechange = function() {
+      if (xhr.readyState !== XMLHttpRequest.DONE) return
+      if (xhr.status < 200 || xhr.status >= 300) return
+      var url = ""
+      try { url = String((JSON.parse(xhr.responseText || "{}") || {}).url || "") } catch (e) {}
+      if (url) root.playUrl(url)
+    }
+    xhr.send(JSON.stringify({
+      engine_id: root.ttsEntity,
+      language: root.activeLanguage,
+      message: line
+    }))
+  }
+
+  function playUrl(url) {
+    root.stopSpeaking()
+    var cmd = root.player.indexOf("mpv") >= 0
+      ? [root.player, "--no-video", "--really-quiet", url]
+      : [root.player, "-nodisp", "-autoexit", "-loglevel", "quiet", url]
+    playProcess.command = cmd
+    playProcess.running = true
+    root.speaking = true
+  }
+
+  function stopSpeaking() {
+    if (playProcess.running) playProcess.signal(15)
+    root.speaking = false
+  }
+
+  property Process playProcess: Process {
+    command: []
+    onExited: function(exitCode) { root.speaking = false }
   }
 
   // --- credentials --------------------------------------------------------

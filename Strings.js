@@ -41,6 +41,8 @@ var TABLE = {
     sttOff: "Off",
     languagesLabel: "Languages you speak (comma-separated)",
     micLabel: "Microphone",
+    ttsLabel: "Speaking back — which voice answers you, per language",
+    stopSpeaking: "Stop",
     micDefault: "System default",
     autoSendLabel: "Send speech straight away in",
     save: "Save & connect"
@@ -76,6 +78,8 @@ var TABLE = {
     sttOff: "Izklopljeno",
     languagesLabel: "Jeziki, ki jih govoriš (ločeni z vejico)",
     micLabel: "Mikrofon",
+    ttsLabel: "Govorjeni odgovori — kateri glas ti odgovarja, po jezikih",
+    stopSpeaking: "Ustavi",
     micDefault: "Sistemsko privzeto",
     autoSendLabel: "Govor pošlji takoj v",
     save: "Shrani in poveži"

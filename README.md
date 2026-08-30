@@ -93,6 +93,19 @@ Recording uses `pw-record` (part of PipeWire, already on Omarchy) at 16 kHz mono
 — exactly the format Assist expects — and Home Assistant does the transcribing,
 so this plugin never handles a transcription key or model of its own.
 
+### Speaking back
+
+Pick a voice per language under **Speaking back** and Nives answers out loud —
+but **only when you spoke to her**. Type a question and you get text, because
+being read a paragraph when you wanted to glance at a number is worse than
+useless.
+
+The voices are your Home Assistant's own TTS engines, so nothing here needs a
+key, a model or a per-word cost. Playback streams straight from Home Assistant
+via `mpv` (or `ffplay`). **Stop** appears in the header while she is talking,
+Escape silences her, and clicking the microphone cuts her off and starts
+listening — so you can talk over her, as you would a person.
+
 ### Which language am I in?
 
 The header shows a language chip — `EN`, `SL` — for the language the plugin

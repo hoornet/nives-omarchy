@@ -32,6 +32,8 @@ Item {
   property string pickedStt: ""
   property var pickedAutoSend: []
   property string pickedMic: ""
+  property var pickedTts: ({})
+  property bool spokenInput: false
 
   // Shares the [menu] surface tokens — themes that style the menu also style
   // this card.
@@ -79,7 +81,7 @@ Item {
     try { payload = JSON.parse(payloadJson || "{}") || {} } catch (e) {}
     if (payload.settings) root.settingsOpen = true
     if (root.svc && !root.svc.configured) root.settingsOpen = true
-    if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice(); root.pickedMic = root.svc.micSource }
+    if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice(); root.pickedMic = root.svc.micSource; root.pickedTts = JSON.parse(JSON.stringify(root.svc.ttsEntities)) }
     root.focusInput()
   }
 
@@ -89,6 +91,10 @@ Item {
 
   // Escape steps back one level: out of settings first, then out of the panel.
   function stepBack() {
+    if (root.svc && root.svc.speaking) {
+      root.svc.stopSpeaking()
+      return
+    }
     if (root.settingsOpen) {
       root.settingsOpen = false
       root.focusInput()
@@ -124,6 +130,7 @@ Item {
     ignoreUnknownSignals: true
     function onTranscribed(text) {
       input.text = text
+      root.spokenInput = true
       if (root.svc && root.svc.autoSendActive) root.sendCurrent()
       root.focusInput()
     }
@@ -132,6 +139,8 @@ Item {
   function sendCurrent() {
     if (!root.svc) return
     var line = input.text
+    root.svc.pendingSpeak = root.spokenInput
+    root.spokenInput = false
     if (root.svc.send(line)) {
       input.text = ""
       transcriptView.positionViewAtEnd()
@@ -152,6 +161,7 @@ Item {
       sttEntity: root.pickedStt,
       autoSendLanguages: root.pickedAutoSend,
       micSource: root.pickedMic,
+      ttsEntities: root.pickedTts,
       languages: langs.length ? langs : ["en"]
     })
     // A language that just disappeared from the list must not stay selected.
@@ -239,6 +249,34 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
               elide: Text.ElideRight
               width: Math.min(implicitWidth, card.width * 0.32)
+            }
+
+            // Only present while she is talking, because a control that does
+            // nothing most of the time teaches you to ignore it.
+            Rectangle {
+              width: stopLabel.implicitWidth + Style.spacing.controlPaddingX * 1.6
+              height: header.height - Style.space(8)
+              radius: root.cornerRadius
+              anchors.verticalCenter: parent.verticalCenter
+              visible: root.svc && root.svc.speaking
+              color: stopArea.containsMouse ? root.accent : root.bubbleBackground
+
+              Text {
+                id: stopLabel
+                anchors.centerIn: parent
+                text: "\u25a0 " + Strings.t(root.uiLang, "stopSpeaking")
+                color: stopArea.containsMouse ? root.background : root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+              }
+
+              MouseArea {
+                id: stopArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: if (root.svc) root.svc.stopSpeaking()
+              }
             }
 
             // Which language this conversation is in — the one thing you
@@ -337,7 +375,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                  if (!root.settingsOpen && root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice(); root.pickedMic = root.svc.micSource }
+                  if (!root.settingsOpen && root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice(); root.pickedMic = root.svc.micSource; root.pickedTts = JSON.parse(JSON.stringify(root.svc.ttsEntities)) }
                   root.settingsOpen = !root.settingsOpen
                   root.focusInput()
                 }
@@ -504,6 +542,82 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.pickedStt = modelData.id
+                  }
+                }
+              }
+            }
+
+            Text {
+              text: Strings.t(root.uiLang, "ttsLabel")
+              color: root.foreground
+              opacity: 0.7
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
+            }
+
+            Repeater {
+              model: root.svc ? root.svc.languages : []
+
+              Column {
+                id: langRow
+                required property var modelData
+                width: parent.width
+                spacing: Style.spacing.sm
+
+                Text {
+                  text: langRow.modelData.toUpperCase()
+                  color: root.foreground
+                  opacity: 0.5
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                }
+
+                Flow {
+                  width: parent.width
+                  spacing: Style.spacing.sm
+
+                  Repeater {
+                    model: root.svc
+                      ? [{id: "", name: Strings.t(root.uiLang, "sttOff")}].concat(root.svc.ttsEngines)
+                      : []
+
+                    Rectangle {
+                      required property var modelData
+                      readonly property string lang: langRow.modelData
+                      readonly property bool picked:
+                        String(root.pickedTts[lang] || "") === modelData.id
+
+                      width: ttsChipText.implicitWidth + Style.spacing.controlPaddingX * 2
+                      height: Style.space(30)
+                      radius: root.cornerRadius
+                      color: picked ? root.accent : (ttsChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                      border.width: picked ? 0 : 1
+                      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                      Text {
+                        id: ttsChipText
+                        anchors.centerIn: parent
+                        text: modelData.name
+                        color: parent.picked ? root.background : root.foreground
+                        font.family: root.fontFamily
+                        font.pixelSize: Style.font.body
+                      }
+
+                      MouseArea {
+                        id: ttsChipArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                          var next = JSON.parse(JSON.stringify(root.pickedTts))
+                          if (modelData.id) next[langRow.modelData] = modelData.id
+                          else delete next[langRow.modelData]
+                          root.pickedTts = next
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -768,6 +882,7 @@ Item {
                 placeholderText: root.micHint
                 enabled: !(root.svc && (root.svc.busy || root.svc.recording || root.svc.transcribing))
                 onAccepted: root.sendCurrent()
+                onTextEdited: root.spokenInput = false
                 Keys.onEscapePressed: root.stepBack()
               }
 
@@ -809,6 +924,7 @@ Item {
                   cursorShape: Qt.PointingHandCursor
                   onClicked: {
                     if (!root.svc) return
+                    if (root.svc.speaking) root.svc.stopSpeaking()
                     if (root.svc.recording) root.svc.stopListening()
                     else if (!root.svc.transcribing) root.svc.startListening()
                   }
