@@ -78,6 +78,12 @@ transcription is reliable, an approval step is pure friction; where it is not,
 sending a garbled sentence only spends a round-trip being misunderstood. Tick
 the languages you trust under **Send spoken messages straight away**.
 
+Pick your **Microphone** in settings rather than leaving it on the system
+default. The default is whatever your machine last decided it was, and a
+Bluetooth headset connecting will quietly take it over — which produces audio
+so band-limited that transcription of anything but English falls apart. Naming
+the device you mean avoids the entire class of problem.
+
 Recording uses `pw-record` (part of PipeWire, already on Omarchy) at 16 kHz mono
 — exactly the format Assist expects — and Home Assistant does the transcribing,
 so this plugin never handles a transcription key or model of its own.

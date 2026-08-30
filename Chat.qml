@@ -31,6 +31,7 @@ Item {
   property string pickedAgent: ""
   property string pickedStt: ""
   property var pickedAutoSend: []
+  property string pickedMic: ""
 
   // Shares the [menu] surface tokens — themes that style the menu also style
   // this card.
@@ -73,7 +74,7 @@ Item {
   function open(payloadJson) {
     root.opened = true
     if (root.svc && !root.svc.configured) root.settingsOpen = true
-    if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice() }
+    if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice(); root.pickedMic = root.svc.micSource }
     root.focusInput()
   }
 
@@ -135,6 +136,7 @@ Item {
       agentId: root.pickedAgent,
       sttEntity: root.pickedStt,
       autoSendLanguages: root.pickedAutoSend,
+      micSource: root.pickedMic,
       languages: langs.length ? langs : ["en"]
     })
     // A language that just disappeared from the list must not stay selected.
@@ -314,7 +316,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                  if (!root.settingsOpen && root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice() }
+                  if (!root.settingsOpen && root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice(); root.pickedMic = root.svc.micSource }
                   root.settingsOpen = !root.settingsOpen
                   root.focusInput()
                 }
@@ -473,6 +475,55 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: root.pickedStt = modelData.id
+                  }
+                }
+              }
+            }
+
+            Text {
+              text: Strings.t(root.uiLang, "micLabel")
+              color: root.foreground
+              opacity: 0.7
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+
+            Flow {
+              width: parent.width
+              spacing: Style.spacing.sm
+              visible: root.svc && root.svc.micSources.length > 0
+
+              Repeater {
+                model: root.svc
+                  ? [{id: "", name: Strings.t(root.uiLang, "micDefault")}].concat(root.svc.micSources)
+                  : []
+
+                Rectangle {
+                  required property var modelData
+                  readonly property bool picked: root.pickedMic === modelData.id
+
+                  width: micChipText.implicitWidth + Style.spacing.controlPaddingX * 2
+                  height: Style.space(30)
+                  radius: root.cornerRadius
+                  color: picked ? root.accent : (micChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                  border.width: picked ? 0 : 1
+                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                  Text {
+                    id: micChipText
+                    anchors.centerIn: parent
+                    text: modelData.name
+                    color: parent.picked ? root.background : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  MouseArea {
+                    id: micChipArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.pickedMic = modelData.id
                   }
                 }
               }

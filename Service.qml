@@ -56,7 +56,7 @@ Item {
   }
 
   function parseConfig(text) {
-    var out = { baseUrl: "", agentId: "", sttEntity: "", languages: ["en"], autoSendLanguages: ["en"] }
+    var out = { baseUrl: "", agentId: "", sttEntity: "", micSource: "", languages: ["en"], autoSendLanguages: ["en"] }
     if (!text) return out
     try {
       var parsed = JSON.parse(text)
@@ -64,6 +64,7 @@ Item {
         if (typeof parsed.baseUrl === "string") out.baseUrl = parsed.baseUrl
         if (typeof parsed.agentId === "string") out.agentId = parsed.agentId
         if (typeof parsed.sttEntity === "string") out.sttEntity = parsed.sttEntity
+        if (typeof parsed.micSource === "string") out.micSource = parsed.micSource
         if (Array.isArray(parsed.autoSendLanguages)) {
           var auto = []
           for (var a = 0; a < parsed.autoSendLanguages.length; a++) {
@@ -92,6 +93,7 @@ Item {
       baseUrl: root.config.baseUrl,
       agentId: root.config.agentId,
       sttEntity: root.config.sttEntity,
+      micSource: root.config.micSource,
       languages: root.config.languages,
       autoSendLanguages: root.config.autoSendLanguages
     }
@@ -270,6 +272,7 @@ Item {
         root.phase = "ready"
         root.lastError = ""
         root.loadAgents()
+        root.loadMicSources()
       } else {
         root.fail(root.statusMessage(xhr.status))
       }
@@ -299,6 +302,45 @@ Item {
   // or the patience gives out.
   readonly property int maxRecordSeconds: 60
 
+  // Which microphone to record from. Left empty this follows the system
+  // default, which is convenient right up until a Bluetooth headset connects
+  // and quietly becomes the default — recording your sentence through a
+  // headset mic you had forgotten was on.
+  readonly property string micSource: String(config.micSource || "")
+  property var micSources: []
+
+  function loadMicSources() {
+    micListProcess.running = true
+  }
+
+  property string micListOutput: ""
+
+  property Process micListProcess: Process {
+    command: ["pactl", "-f", "json", "list", "sources"]
+    stdout: SplitParser {
+      onRead: function(line) { root.micListOutput += String(line || "") }
+    }
+    onExited: function(exitCode) {
+      var raw = root.micListOutput
+      root.micListOutput = ""
+      if (exitCode !== 0) return
+      var found = []
+      try {
+        var list = JSON.parse(raw || "[]")
+        for (var i = 0; i < list.length; i++) {
+          var name = String(list[i].name || "")
+          // Monitors are loopbacks of an output — they record what the machine
+          // is playing, never what is said into the room.
+          if (!name || name.indexOf(".monitor") >= 0) continue
+          found.push({ id: name, name: String(list[i].description || name) })
+        }
+      } catch (e) {
+        return
+      }
+      root.micSources = found
+    }
+  }
+
   function startListening() {
     if (root.recording || root.transcribing || !root.canListen) return
     root.listenError = ""
@@ -306,10 +348,10 @@ Item {
     // the machine can read /proc/<pid>/cmdline, and XDG_RUNTIME_DIR is the one
     // directory that is already private to this user.
     authHeaderFile.setText("Authorization: Bearer " + root.token + "\n")
-    recordProcess.command = [
-      "pw-record", "--rate", "16000", "--channels", "1",
-      "--format", "s16", "--container", "raw", root.audioPath
-    ]
+    var cmd = ["pw-record", "--rate", "16000", "--channels", "1",
+               "--format", "s16", "--container", "raw"]
+    if (root.micSource) cmd = cmd.concat(["--target", root.micSource])
+    recordProcess.command = cmd.concat([root.audioPath])
     recordProcess.running = true
     root.recording = true
     recordLimit.restart()
