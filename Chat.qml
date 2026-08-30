@@ -5,8 +5,10 @@ import qs.Commons
 import qs.Ui
 
 // The chat overlay: a summoned card holding one running conversation with the
-// Home Assistant Assist agent. Window structure (scrim + centred card +
-// exclusive keyboard focus) follows the first-party emoji picker.
+// Home Assistant Assist agent. The layer-shell window and its exclusive
+// keyboard focus follow the first-party emoji picker; the card itself sits in
+// the top-right corner over an undimmed screen, because you usually summon it
+// to ask about whatever you are already looking at.
 Item {
   id: root
 
@@ -34,15 +36,19 @@ Item {
   property color foreground: Color.menu.text
   property color border: Color.menu.border
   property var borderSpec: Border.surfaceSpec("menu", "border", border, Math.max(1, Style.space(2)))
-  property color scrim: Color.menu.scrim
   property color bubbleBackground: Color.menu.selectedBackground
   property color accent: Color.menu.selectedText
   readonly property int cornerRadius: Style.cornerRadius
   property string fontFamily: Style.font.menuFamily
   property int contentMargin: Style.spacing.panelPadding
   property int contentSpacing: Style.spacing.md
-  property int cardWidth: Math.min(Style.space(560), panel.width - Style.gapsOut * 2)
-  property int cardHeight: Math.min(Style.space(640), panel.height - Style.gapsOut * 2)
+  // A companion, not a modal: the card sits under the bar in the top-right
+  // corner and the screen behind it is left undimmed, so whatever you were
+  // reading when you summoned Nives is still readable while you ask about it.
+  property int cardWidth: Style.space(420)
+  property int cardHeight: Style.space(620)
+  readonly property int topInset: Style.bar.sizeHorizontal + Style.gapsOut * 2
+  readonly property int sideInset: Style.gapsOut * 2
 
   readonly property string micHint: {
     if (!root.svc) return "Message your house…"
@@ -136,37 +142,29 @@ Item {
     root.focusInput()
   }
 
+  // The window IS the card: a surface only as big as the panel, tucked under
+  // the bar on the right. Anything outside it belongs to whatever you were
+  // already doing, which is the whole point of the corner placement.
   PanelWindow {
     id: panel
     visible: root.opened
-    anchors { top: true; bottom: true; left: true; right: true }
+    anchors { top: true; right: true }
+    margins { top: root.topInset; right: root.sideInset }
+    implicitWidth: root.cardWidth
+    implicitHeight: root.cardHeight
     color: "transparent"
     WlrLayershell.namespace: "nives-chat"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     exclusionMode: ExclusionMode.Ignore
 
-    Rectangle {
-      anchors.fill: parent
-      color: root.scrim
-    }
-
-    MouseArea {
-      anchors.fill: parent
-      onClicked: root.dismiss()
-    }
-
     BorderSurface {
       id: card
-      width: root.cardWidth
-      height: root.cardHeight
+      anchors.fill: parent
       radius: root.cornerRadius
-      anchors.centerIn: parent
       color: root.background
       borderSpec: root.borderSpec
       padding: root.contentMargin
-
-      MouseArea { anchors.fill: parent; onClicked: {} }
 
       Column {
         anchors.fill: parent
