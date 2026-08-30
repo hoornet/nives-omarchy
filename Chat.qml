@@ -98,14 +98,16 @@ Item {
     })
   }
 
-  // Transcribed speech lands in the box rather than being sent straight off:
-  // you get to see what was heard, which matters most in exactly the languages
-  // where it is hardest to hear.
+  // Speaking should end with an answer, not with a button. The transcript is
+  // still shown — it becomes your message in the conversation above — so a
+  // misheard sentence is visible either way; making you approve every one of
+  // them just put a click between you and your house.
   Connections {
     target: root.svc
     ignoreUnknownSignals: true
     function onTranscribed(text) {
       input.text = text
+      root.sendCurrent()
       root.focusInput()
     }
   }

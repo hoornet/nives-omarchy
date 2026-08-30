@@ -72,10 +72,10 @@ when you switch on Transcription in the add-on — pick it under **Speaking** in
 settings and a microphone button appears next to the message box. Click it,
 say your piece, click again.
 
-What you said lands **in the message box rather than being sent**, so you can
-read it back before pressing Enter. That is deliberate: transcription of
-smaller languages is the least reliable part of the whole chain, and seeing the
-words is how you know whether to trust them.
+What you said is transcribed and **sent straight away** — speaking should end
+with an answer, not with a button. The words still appear as your message in
+the conversation, so if something was misheard you can see exactly what was
+heard and say it again.
 
 Recording uses `pw-record` (part of PipeWire, already on Omarchy) at 16 kHz mono
 — exactly the format Assist expects — and Home Assistant does the transcribing,
