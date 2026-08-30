@@ -52,6 +52,39 @@ Optionally, add it to the Omarchy menu in
 { "icon": "❄", "label": "Nives", "action": "omarchy-shell shell toggle io.github.hoornet.nives '{}'" }
 ```
 
+## Removing it
+
+```bash
+omarchy plugin remove io.github.hoornet.nives
+```
+
+That unloads and deletes the plugin. Three things live outside it and are left
+alone, so remove them yourself if you want no trace:
+
+```bash
+rm -rf ~/.config/omarchy/io.github.hoornet.nives          # your settings
+secret-tool clear service io.github.hoornet.nives          # your access token
+```
+
+and delete the `SUPER + ALT + N` line from `~/.config/hypr/bindings.lua`.
+
+## What it needs
+
+Everything here ships with Omarchy — the list is for completeness, not for you
+to install:
+
+| | used for |
+|---|---|
+| Omarchy 4 (Quattro) | the shell this plugin loads into |
+| `secret-tool` (libsecret) | storing your Home Assistant token in the system keyring |
+| `pw-record` (PipeWire) | recording, if you use the microphone |
+| `curl` | uploading the recording to Home Assistant |
+| `mpv` or `ffplay` | playing spoken answers |
+| `pactl` | listing your microphones |
+
+It needs no Python, no daemon, and no library of its own: the plugin is QML,
+and Home Assistant does the thinking, transcribing and speaking.
+
 ## Connect to Home Assistant
 
 1. In Home Assistant, open your **profile page** (your name, bottom of the

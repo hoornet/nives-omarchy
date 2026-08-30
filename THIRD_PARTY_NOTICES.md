@@ -14,3 +14,17 @@ are this plugin's own.
 The overlay window structure (scrim + centred card + exclusive keyboard focus)
 follows the first-party Omarchy emoji picker
 ([basecamp/omarchy](https://github.com/basecamp/omarchy), MIT).
+
+## External programs
+
+The plugin ships no bundled dependencies. It calls these programs, all of which
+come with Omarchy, and none of which are redistributed here:
+
+- `secret-tool` (libsecret) — stores the Home Assistant token in the keyring
+- `pw-record` (PipeWire) — records from the microphone
+- `pactl` (PulseAudio/PipeWire) — lists capture devices
+- `curl` — uploads the recording to Home Assistant
+- `mpv` or `ffplay` — plays spoken answers
+
+The plugin itself is MIT (see LICENSE). It contains no code from Home Assistant
+or from the Nives add-on; it speaks to Home Assistant over its public HTTP API.
