@@ -390,391 +390,400 @@ Item {
           height: parent.height - header.height - root.contentSpacing
 
           // Settings pane
-          Column {
+          // The pane outgrew the panel once voices were added, so it scrolls.
+          Flickable {
             anchors.fill: parent
-            spacing: root.contentSpacing
             visible: root.settingsOpen
+            contentHeight: settingsCol.height
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            flickDeceleration: 4000
+            Column {
+              id: settingsCol
+            width: parent.width
+              spacing: root.contentSpacing
 
-            Text {
-              text: Strings.t(root.uiLang, "addressLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
-
-            TextField {
-              id: urlField
-              width: parent.width
-              text: root.svc ? String(root.svc.config.baseUrl || "") : ""
-              placeholderText: Strings.t(root.uiLang, "addressPlaceholder")
-              onAccepted: agentField.forceActiveFocus()
-              Keys.onEscapePressed: root.stepBack()
-            }
-
-            Text {
-              text: Strings.t(root.uiLang, "tokenLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
-
-            TextField {
-              id: tokenField
-              width: parent.width
-              password: true
-              placeholderText: root.svc && root.svc.token ? Strings.t(root.uiLang, "tokenStored") : Strings.t(root.uiLang, "tokenPlaceholder")
-              onAccepted: root.saveSettings()
-              Keys.onEscapePressed: root.stepBack()
-            }
-
-            Text {
-              text: Strings.t(root.uiLang, "agentLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
-
-            // Picking from what the house actually offers, rather than typing
-            // an entity id. Leaving it on "Default" is how you end up talking
-            // to Home Assistant's built-in intent matcher — which answers
-            // "sorry, I couldn't understand" to anything conversational.
-            Flow {
-              width: parent.width
-              spacing: Style.spacing.sm
-              visible: root.svc && root.svc.agents.length > 0
-
-              Repeater {
-                model: root.svc ? root.svc.agents : []
-
-                Rectangle {
-                  required property var modelData
-                  readonly property bool picked: root.pickedAgent === modelData.id
-
-                  width: chipText.implicitWidth + Style.spacing.controlPaddingX * 2
-                  height: Style.space(30)
-                  radius: root.cornerRadius
-                  color: picked ? root.accent : (chipArea.containsMouse ? root.bubbleBackground : "transparent")
-                  border.width: picked ? 0 : 1
-                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-
-                  Text {
-                    id: chipText
-                    anchors.centerIn: parent
-                    text: modelData.name
-                    color: parent.picked ? root.background : root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  MouseArea {
-                    id: chipArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.pickedAgent = modelData.id
-                  }
-                }
+              Text {
+                text: Strings.t(root.uiLang, "addressLabel")
+                color: root.foreground
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
               }
-            }
 
-            Text {
-              text: root.svc && root.svc.agents.length > 0
-                ? "" : Strings.t(root.uiLang, "agentEmpty")
-              visible: text !== ""
-              color: root.foreground
-              opacity: 0.5
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              wrapMode: Text.Wrap
-              width: parent.width
-            }
-
-            Text {
-              text: Strings.t(root.uiLang, "sttLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
-
-            Flow {
-              width: parent.width
-              spacing: Style.spacing.sm
-              visible: root.svc && root.svc.sttEngines.length > 0
-
-              Repeater {
-                model: root.svc ? [{id: "", name: Strings.t(root.uiLang, "sttOff")}].concat(root.svc.sttEngines) : []
-
-                Rectangle {
-                  required property var modelData
-                  readonly property bool picked: root.pickedStt === modelData.id
-
-                  width: sttChipText.implicitWidth + Style.spacing.controlPaddingX * 2
-                  height: Style.space(30)
-                  radius: root.cornerRadius
-                  color: picked ? root.accent : (sttChipArea.containsMouse ? root.bubbleBackground : "transparent")
-                  border.width: picked ? 0 : 1
-                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-
-                  Text {
-                    id: sttChipText
-                    anchors.centerIn: parent
-                    text: modelData.name
-                    color: parent.picked ? root.background : root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  MouseArea {
-                    id: sttChipArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.pickedStt = modelData.id
-                  }
-                }
+              TextField {
+                id: urlField
+                width: parent.width
+                text: root.svc ? String(root.svc.config.baseUrl || "") : ""
+                placeholderText: Strings.t(root.uiLang, "addressPlaceholder")
+                onAccepted: agentField.forceActiveFocus()
+                Keys.onEscapePressed: root.stepBack()
               }
-            }
 
-            Text {
-              text: Strings.t(root.uiLang, "ttsLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
+              Text {
+                text: Strings.t(root.uiLang, "tokenLabel")
+                color: root.foreground
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
+              }
 
-            Repeater {
-              model: root.svc ? root.svc.languages : []
+              TextField {
+                id: tokenField
+                width: parent.width
+                password: true
+                placeholderText: root.svc && root.svc.token ? Strings.t(root.uiLang, "tokenStored") : Strings.t(root.uiLang, "tokenPlaceholder")
+                onAccepted: root.saveSettings()
+                Keys.onEscapePressed: root.stepBack()
+              }
 
-              Column {
-                id: langRow
-                required property var modelData
+              Text {
+                text: Strings.t(root.uiLang, "agentLabel")
+                color: root.foreground
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
+              }
+
+              // Picking from what the house actually offers, rather than typing
+              // an entity id. Leaving it on "Default" is how you end up talking
+              // to Home Assistant's built-in intent matcher — which answers
+              // "sorry, I couldn't understand" to anything conversational.
+              Flow {
                 width: parent.width
                 spacing: Style.spacing.sm
+                visible: root.svc && root.svc.agents.length > 0
 
-                Text {
-                  text: langRow.modelData.toUpperCase()
-                  color: root.foreground
-                  opacity: 0.5
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.body
+                Repeater {
+                  model: root.svc ? root.svc.agents : []
+
+                  Rectangle {
+                    required property var modelData
+                    readonly property bool picked: root.pickedAgent === modelData.id
+
+                    width: chipText.implicitWidth + Style.spacing.controlPaddingX
+                    height: Style.space(22)
+                    radius: root.cornerRadius
+                    color: picked ? root.accent : (chipArea.containsMouse ? root.bubbleBackground : "transparent")
+                    border.width: picked ? 0 : 1
+                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                    Text {
+                      id: chipText
+                      anchors.centerIn: parent
+                      text: modelData.name
+                      color: parent.picked ? root.background : root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+
+                    MouseArea {
+                      id: chipArea
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.pickedAgent = modelData.id
+                    }
+                  }
                 }
+              }
 
-                Flow {
+              Text {
+                text: root.svc && root.svc.agents.length > 0
+                  ? "" : Strings.t(root.uiLang, "agentEmpty")
+                visible: text !== ""
+                color: root.foreground
+                opacity: 0.5
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                wrapMode: Text.Wrap
+                width: parent.width
+              }
+
+              Text {
+                text: Strings.t(root.uiLang, "sttLabel")
+                color: root.foreground
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
+              }
+
+              Flow {
+                width: parent.width
+                spacing: Style.spacing.sm
+                visible: root.svc && root.svc.sttEngines.length > 0
+
+                Repeater {
+                  model: root.svc ? [{id: "", name: Strings.t(root.uiLang, "sttOff")}].concat(root.svc.sttEngines) : []
+
+                  Rectangle {
+                    required property var modelData
+                    readonly property bool picked: root.pickedStt === modelData.id
+
+                    width: sttChipText.implicitWidth + Style.spacing.controlPaddingX
+                    height: Style.space(22)
+                    radius: root.cornerRadius
+                    color: picked ? root.accent : (sttChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                    border.width: picked ? 0 : 1
+                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                    Text {
+                      id: sttChipText
+                      anchors.centerIn: parent
+                      text: modelData.name
+                      color: parent.picked ? root.background : root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+
+                    MouseArea {
+                      id: sttChipArea
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.pickedStt = modelData.id
+                    }
+                  }
+                }
+              }
+
+              Text {
+                text: Strings.t(root.uiLang, "ttsLabel")
+                color: root.foreground
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
+              }
+
+              Repeater {
+                model: root.svc ? root.svc.languages : []
+
+                Column {
+                  id: langRow
+                  required property var modelData
                   width: parent.width
                   spacing: Style.spacing.sm
 
-                  Repeater {
-                    model: root.svc
-                      ? [{id: "", name: Strings.t(root.uiLang, "sttOff")}].concat(root.svc.ttsEngines)
-                      : []
+                  Text {
+                    text: langRow.modelData.toUpperCase()
+                    color: root.foreground
+                    opacity: 0.5
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
 
-                    Rectangle {
-                      required property var modelData
-                      readonly property string lang: langRow.modelData
-                      readonly property bool picked:
-                        String(root.pickedTts[lang] || "") === modelData.id
+                  Flow {
+                    width: parent.width
+                    spacing: Style.spacing.sm
 
-                      width: ttsChipText.implicitWidth + Style.spacing.controlPaddingX * 2
-                      height: Style.space(30)
-                      radius: root.cornerRadius
-                      color: picked ? root.accent : (ttsChipArea.containsMouse ? root.bubbleBackground : "transparent")
-                      border.width: picked ? 0 : 1
-                      border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                    Repeater {
+                      model: root.svc
+                        ? [{id: "", name: Strings.t(root.uiLang, "sttOff")}].concat(root.svc.ttsEngines)
+                        : []
 
-                      Text {
-                        id: ttsChipText
-                        anchors.centerIn: parent
-                        text: modelData.name
-                        color: parent.picked ? root.background : root.foreground
-                        font.family: root.fontFamily
-                        font.pixelSize: Style.font.body
-                      }
+                      Rectangle {
+                        required property var modelData
+                        readonly property string lang: langRow.modelData
+                        readonly property bool picked:
+                          String(root.pickedTts[lang] || "") === modelData.id
 
-                      MouseArea {
-                        id: ttsChipArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                          var next = JSON.parse(JSON.stringify(root.pickedTts))
-                          if (modelData.id) next[langRow.modelData] = modelData.id
-                          else delete next[langRow.modelData]
-                          root.pickedTts = next
+                        width: ttsChipText.implicitWidth + Style.spacing.controlPaddingX
+                        height: Style.space(22)
+                        radius: root.cornerRadius
+                        color: picked ? root.accent : (ttsChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                        border.width: picked ? 0 : 1
+                        border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                        Text {
+                          id: ttsChipText
+                          anchors.centerIn: parent
+                          text: modelData.name
+                          color: parent.picked ? root.background : root.foreground
+                          font.family: root.fontFamily
+                          font.pixelSize: Style.font.bodySmall
+                        }
+
+                        MouseArea {
+                          id: ttsChipArea
+                          anchors.fill: parent
+                          hoverEnabled: true
+                          cursorShape: Qt.PointingHandCursor
+                          onClicked: {
+                            var next = JSON.parse(JSON.stringify(root.pickedTts))
+                            if (modelData.id) next[langRow.modelData] = modelData.id
+                            else delete next[langRow.modelData]
+                            root.pickedTts = next
+                          }
                         }
                       }
                     }
                   }
                 }
               }
-            }
 
-            Text {
-              text: Strings.t(root.uiLang, "micLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
-
-            Flow {
-              width: parent.width
-              spacing: Style.spacing.sm
-              visible: root.svc && root.svc.micSources.length > 0
-
-              Repeater {
-                model: root.svc
-                  ? [{id: "", name: Strings.t(root.uiLang, "micDefault")}].concat(root.svc.micSources)
-                  : []
-
-                Rectangle {
-                  required property var modelData
-                  readonly property bool picked: root.pickedMic === modelData.id
-
-                  width: micChipText.implicitWidth + Style.spacing.controlPaddingX * 2
-                  height: Style.space(30)
-                  radius: root.cornerRadius
-                  color: picked ? root.accent : (micChipArea.containsMouse ? root.bubbleBackground : "transparent")
-                  border.width: picked ? 0 : 1
-                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
-
-                  Text {
-                    id: micChipText
-                    anchors.centerIn: parent
-                    text: modelData.name
-                    color: parent.picked ? root.background : root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  MouseArea {
-                    id: micChipArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.pickedMic = modelData.id
-                  }
-                }
+              Text {
+                text: Strings.t(root.uiLang, "micLabel")
+                color: root.foreground
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
               }
-            }
 
-            Text {
-              text: Strings.t(root.uiLang, "autoSendLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
+              Flow {
+                width: parent.width
+                spacing: Style.spacing.sm
+                visible: root.svc && root.svc.micSources.length > 0
 
-            Flow {
-              width: parent.width
-              spacing: Style.spacing.sm
+                Repeater {
+                  model: root.svc
+                    ? [{id: "", name: Strings.t(root.uiLang, "micDefault")}].concat(root.svc.micSources)
+                    : []
 
-              Repeater {
-                model: root.svc ? root.svc.languages : []
+                  Rectangle {
+                    required property var modelData
+                    readonly property bool picked: root.pickedMic === modelData.id
 
-                Rectangle {
-                  required property var modelData
-                  readonly property bool picked: {
-                    var list = root.pickedAutoSend || []
-                    for (var i = 0; i < list.length; i++)
-                      if (String(list[i]) === String(modelData)) return true
-                    return false
-                  }
+                    width: micChipText.implicitWidth + Style.spacing.controlPaddingX
+                    height: Style.space(22)
+                    radius: root.cornerRadius
+                    color: picked ? root.accent : (micChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                    border.width: picked ? 0 : 1
+                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
 
-                  width: autoChipText.implicitWidth + Style.spacing.controlPaddingX * 2
-                  height: Style.space(30)
-                  radius: root.cornerRadius
-                  color: picked ? root.accent : (autoChipArea.containsMouse ? root.bubbleBackground : "transparent")
-                  border.width: picked ? 0 : 1
-                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+                    Text {
+                      id: micChipText
+                      anchors.centerIn: parent
+                      text: modelData.name
+                      color: parent.picked ? root.background : root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
 
-                  Text {
-                    id: autoChipText
-                    anchors.centerIn: parent
-                    text: modelData.toUpperCase()
-                    color: parent.picked ? root.background : root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  MouseArea {
-                    id: autoChipArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                      var next = root.pickedAutoSend.slice()
-                      var at = next.indexOf(modelData)
-                      if (at >= 0) next.splice(at, 1)
-                      else next.push(modelData)
-                      root.pickedAutoSend = next
+                    MouseArea {
+                      id: micChipArea
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.pickedMic = modelData.id
                     }
                   }
                 }
               }
-            }
-
-            Text {
-              text: Strings.t(root.uiLang, "languagesLabel")
-              color: root.foreground
-              opacity: 0.7
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body
-              width: parent.width
-              wrapMode: Text.Wrap
-            }
-
-            TextField {
-              id: langField
-              width: parent.width
-              text: root.svc ? root.svc.languages.join(", ") : ""
-              placeholderText: "en, sl"
-              onAccepted: root.saveSettings()
-              Keys.onEscapePressed: root.stepBack()
-            }
-
-            Item { width: 1; height: Style.spacing.md }
-
-            Rectangle {
-              width: saveLabel.implicitWidth + Style.spacing.controlPaddingX * 3
-              height: Style.space(34)
-              radius: root.cornerRadius
-              color: saveArea.containsMouse ? root.accent : root.bubbleBackground
 
               Text {
-                id: saveLabel
-                anchors.centerIn: parent
-                text: Strings.t(root.uiLang, "save")
-                color: saveArea.containsMouse ? root.background : root.foreground
+                text: Strings.t(root.uiLang, "autoSendLabel")
+                color: root.foreground
+                opacity: 0.7
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
               }
 
-              MouseArea {
-                id: saveArea
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.saveSettings()
+              Flow {
+                width: parent.width
+                spacing: Style.spacing.sm
+
+                Repeater {
+                  model: root.svc ? root.svc.languages : []
+
+                  Rectangle {
+                    required property var modelData
+                    readonly property bool picked: {
+                      var list = root.pickedAutoSend || []
+                      for (var i = 0; i < list.length; i++)
+                        if (String(list[i]) === String(modelData)) return true
+                      return false
+                    }
+
+                    width: autoChipText.implicitWidth + Style.spacing.controlPaddingX
+                    height: Style.space(22)
+                    radius: root.cornerRadius
+                    color: picked ? root.accent : (autoChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                    border.width: picked ? 0 : 1
+                    border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                    Text {
+                      id: autoChipText
+                      anchors.centerIn: parent
+                      text: modelData.toUpperCase()
+                      color: parent.picked ? root.background : root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.bodySmall
+                    }
+
+                    MouseArea {
+                      id: autoChipArea
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: {
+                        var next = root.pickedAutoSend.slice()
+                        var at = next.indexOf(modelData)
+                        if (at >= 0) next.splice(at, 1)
+                        else next.push(modelData)
+                        root.pickedAutoSend = next
+                      }
+                    }
+                  }
+                }
+              }
+
+              Text {
+                text: Strings.t(root.uiLang, "languagesLabel")
+                color: root.foreground
+                opacity: 0.7
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body
+                width: parent.width
+                wrapMode: Text.Wrap
+              }
+
+              TextField {
+                id: langField
+                width: parent.width
+                text: root.svc ? root.svc.languages.join(", ") : ""
+                placeholderText: "en, sl"
+                onAccepted: root.saveSettings()
+                Keys.onEscapePressed: root.stepBack()
+              }
+
+              Item { width: 1; height: Style.spacing.md }
+
+              Rectangle {
+                width: saveLabel.implicitWidth + Style.spacing.controlPaddingX * 1.5
+                height: Style.space(26)
+                radius: root.cornerRadius
+                color: saveArea.containsMouse ? root.accent : root.bubbleBackground
+
+                Text {
+                  id: saveLabel
+                  anchors.centerIn: parent
+                  text: Strings.t(root.uiLang, "save")
+                  color: saveArea.containsMouse ? root.background : root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                }
+
+                MouseArea {
+                  id: saveArea
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.saveSettings()
+                }
               }
             }
           }
