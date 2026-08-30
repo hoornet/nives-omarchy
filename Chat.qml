@@ -155,7 +155,11 @@ Item {
     color: "transparent"
     WlrLayershell.namespace: "nives-chat"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+    // OnDemand, never Exclusive. An exclusive layer surface swallows every
+    // compositor keybind while it is up — workspace switching included — which
+    // is defensible for a fullscreen modal and indefensible for a small panel
+    // in the corner that looks like it is minding its own business.
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
     exclusionMode: ExclusionMode.Ignore
 
     BorderSurface {
