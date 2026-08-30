@@ -87,6 +87,16 @@ Item {
     root.opened = false
   }
 
+  // Escape steps back one level: out of settings first, then out of the panel.
+  function stepBack() {
+    if (root.settingsOpen) {
+      root.settingsOpen = false
+      root.focusInput()
+      return
+    }
+    root.dismiss()
+  }
+
   function dismiss() {
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function")
@@ -293,6 +303,11 @@ Item {
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
                   if (root.svc) root.svc.newConversation()
+                  // Always returns to the conversation. Starting a new chat
+                  // while the settings pane is up used to change nothing you
+                  // could see, leaving the button you arrived by as the only
+                  // way back.
+                  root.settingsOpen = false
                   root.focusInput()
                 }
               }
@@ -308,7 +323,8 @@ Item {
               Text {
                 id: gearLabel
                 anchors.centerIn: parent
-                text: Strings.t(root.uiLang, "settings")
+                text: root.settingsOpen ? Strings.t(root.uiLang, "backToChat")
+                                        : Strings.t(root.uiLang, "settings")
                 color: root.foreground
                 opacity: 0.8
                 font.family: root.fontFamily
@@ -357,7 +373,7 @@ Item {
               text: root.svc ? String(root.svc.config.baseUrl || "") : ""
               placeholderText: Strings.t(root.uiLang, "addressPlaceholder")
               onAccepted: agentField.forceActiveFocus()
-              Keys.onEscapePressed: root.dismiss()
+              Keys.onEscapePressed: root.stepBack()
             }
 
             Text {
@@ -376,7 +392,7 @@ Item {
               password: true
               placeholderText: root.svc && root.svc.token ? Strings.t(root.uiLang, "tokenStored") : Strings.t(root.uiLang, "tokenPlaceholder")
               onAccepted: root.saveSettings()
-              Keys.onEscapePressed: root.dismiss()
+              Keys.onEscapePressed: root.stepBack()
             }
 
             Text {
@@ -619,7 +635,7 @@ Item {
               text: root.svc ? root.svc.languages.join(", ") : ""
               placeholderText: "en, sl"
               onAccepted: root.saveSettings()
-              Keys.onEscapePressed: root.dismiss()
+              Keys.onEscapePressed: root.stepBack()
             }
 
             Item { width: 1; height: Style.spacing.md }
@@ -752,7 +768,7 @@ Item {
                 placeholderText: root.micHint
                 enabled: !(root.svc && (root.svc.busy || root.svc.recording || root.svc.transcribing))
                 onAccepted: root.sendCurrent()
-                Keys.onEscapePressed: root.dismiss()
+                Keys.onEscapePressed: root.stepBack()
               }
 
               // Speak instead of typing. Home Assistant transcribes, so what

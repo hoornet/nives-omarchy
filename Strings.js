@@ -19,6 +19,7 @@ var TABLE = {
 
     newChat: "New chat",
     settings: "Settings",
+    backToChat: "Done",
 
     emptyPrompt: "Ask your house anything.",
     emptyAnswering: "%1 is answering, in %2.",
@@ -53,6 +54,7 @@ var TABLE = {
 
     newChat: "Nov pogovor",
     settings: "Nastavitve",
+    backToChat: "Končano",
 
     emptyPrompt: "Vprašaj svojo hišo karkoli.",
     emptyAnswering: "%1 odgovarja, v %2.",
