@@ -13,6 +13,11 @@ project) — which add memory, natural conversation, and the ability to create
 automations by describing them. But it works with the built-in Assist agent
 too.
 
+Whoever answers you is set on the Home Assistant side, not here — the Nives
+add-on's **Custom Prompt** replaces the assistant's personality outright, so
+the voice in this panel can be Nives, or HAL 9000, or anyone you care to
+describe.
+
 This is deliberately **not** an entity control panel. For lights-and-switches
 widgets in your bar, [konradk/hass](https://github.com/konradk/hass) is
 excellent — the two plugins sit side by side nicely. This one is the
