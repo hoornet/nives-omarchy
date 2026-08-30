@@ -186,9 +186,9 @@ Item {
             spacing: Style.spacing.md
 
             Text {
-              text: "❄"
+              text: "\udb81\udf17"
               color: root.accent
-              font.family: root.fontFamily
+              font.family: Style.font.family
               font.pixelSize: Style.font.title
               anchors.verticalCenter: parent.verticalCenter
             }
@@ -572,10 +572,10 @@ Item {
                 width: parent.width
 
                 Text {
-                  text: "❄"
+                  text: "\udb81\udf17"
                   color: root.accent
                   opacity: 0.7
-                  font.family: root.fontFamily
+                  font.family: Style.font.family
                   font.pixelSize: Style.font.displayLarge
                   horizontalAlignment: Text.AlignHCenter
                   width: parent.width
