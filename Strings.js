@@ -31,17 +31,17 @@ var TABLE = {
 
     addressLabel: "Home Assistant address",
     addressPlaceholder: "http://homeassistant.local — older installs add :8123",
-    tokenLabel: "Long-lived access token (stored in your system keyring)",
+    tokenLabel: "Access token (kept in your system keyring)",
     tokenPlaceholder: "Paste a token from your HA profile page",
     tokenStored: "•••••• (already stored — paste to replace)",
     agentLabel: "Which agent answers you",
     agentEmpty: "Connect first and the agents in your house will be listed here.",
-    sttLabel: "Speaking (optional — which engine transcribes you)",
+    sttLabel: "Speech-to-text engine (optional)",
     sttOff: "Off",
-    languagesLabel: "Languages you speak (comma-separated — switch between them from the header)",
+    languagesLabel: "Languages you speak (comma-separated)",
     micLabel: "Microphone",
     micDefault: "System default",
-    autoSendLabel: "Send spoken messages straight away in these languages (others wait for you to read them first)",
+    autoSendLabel: "Send speech straight away in",
     save: "Save & connect"
   },
 
@@ -65,17 +65,17 @@ var TABLE = {
 
     addressLabel: "Naslov Home Assistanta",
     addressPlaceholder: "http://homeassistant.local — starejše namestitve dodajo :8123",
-    tokenLabel: "Dolgoživi dostopni žeton (shranjen v sistemski ključavnici)",
+    tokenLabel: "Dostopni žeton (shranjen v sistemski ključavnici)",
     tokenPlaceholder: "Prilepi žeton s svoje strani profila v HA",
     tokenStored: "•••••• (že shranjen — prilepi za zamenjavo)",
     agentLabel: "Kateri agent ti odgovarja",
     agentEmpty: "Najprej se poveži in agenti v tvoji hiši se bodo izpisali tukaj.",
-    sttLabel: "Govor (izbirno — kateri pogon te prepisuje)",
+    sttLabel: "Pogon za prepis govora (izbirno)",
     sttOff: "Izklopljeno",
-    languagesLabel: "Jeziki, ki jih govoriš (ločeni z vejico — med njimi preklapljaš zgoraj)",
+    languagesLabel: "Jeziki, ki jih govoriš (ločeni z vejico)",
     micLabel: "Mikrofon",
     micDefault: "Sistemsko privzeto",
-    autoSendLabel: "Izgovorjeno pošlji takoj v teh jezikih (v ostalih počaka, da ga prebereš)",
+    autoSendLabel: "Govor pošlji takoj v",
     save: "Shrani in poveži"
   }
 };

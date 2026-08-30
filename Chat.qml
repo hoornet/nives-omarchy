@@ -73,6 +73,11 @@ Item {
 
   function open(payloadJson) {
     root.opened = true
+    // `summon <id> '{"settings":true}'` lands straight in settings, so a menu
+    // entry or keybind can go there without a detour through the chat.
+    var payload = {}
+    try { payload = JSON.parse(payloadJson || "{}") || {} } catch (e) {}
+    if (payload.settings) root.settingsOpen = true
     if (root.svc && !root.svc.configured) root.settingsOpen = true
     if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity; root.pickedAutoSend = root.svc.autoSendLanguages.slice(); root.pickedMic = root.svc.micSource }
     root.focusInput()
@@ -342,6 +347,8 @@ Item {
               opacity: 0.7
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
             }
 
             TextField {
@@ -359,6 +366,8 @@ Item {
               opacity: 0.7
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
             }
 
             TextField {
@@ -376,6 +385,8 @@ Item {
               opacity: 0.7
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
             }
 
             // Picking from what the house actually offers, rather than typing
@@ -439,6 +450,8 @@ Item {
               opacity: 0.7
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
             }
 
             Flow {
@@ -486,6 +499,8 @@ Item {
               opacity: 0.7
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
             }
 
             Flow {
@@ -535,6 +550,8 @@ Item {
               opacity: 0.7
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
             }
 
             Flow {
@@ -546,7 +563,12 @@ Item {
 
                 Rectangle {
                   required property var modelData
-                  readonly property bool picked: root.pickedAutoSend.indexOf(modelData) >= 0
+                  readonly property bool picked: {
+                    var list = root.pickedAutoSend || []
+                    for (var i = 0; i < list.length; i++)
+                      if (String(list[i]) === String(modelData)) return true
+                    return false
+                  }
 
                   width: autoChipText.implicitWidth + Style.spacing.controlPaddingX * 2
                   height: Style.space(30)
@@ -587,6 +609,8 @@ Item {
               opacity: 0.7
               font.family: root.fontFamily
               font.pixelSize: Style.font.body
+              width: parent.width
+              wrapMode: Text.Wrap
             }
 
             TextField {
