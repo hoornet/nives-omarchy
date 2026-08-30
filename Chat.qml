@@ -26,6 +26,7 @@ Item {
   // Agent chosen in the settings pane but not yet saved. Seeded from the
   // service each time settings opens so cancelling changes nothing.
   property string pickedAgent: ""
+  property string pickedStt: ""
 
   // Shares the [menu] surface tokens — themes that style the menu also style
   // this card.
@@ -43,6 +44,15 @@ Item {
   property int cardWidth: Math.min(Style.space(560), panel.width - Style.gapsOut * 2)
   property int cardHeight: Math.min(Style.space(640), panel.height - Style.gapsOut * 2)
 
+  readonly property string micHint: {
+    if (!root.svc) return "Message your house…"
+    if (root.svc.recording) return "Listening… click the microphone when you're done"
+    if (root.svc.transcribing) return "Working out what you said…"
+    if (root.svc.busy) return "Waiting for the answer…"
+    if (root.svc.listenError) return root.svc.listenError
+    return "Message your house…"
+  }
+
   readonly property string statusText: !root.svc ? "Service not loaded — re-enable the plugin"
     : root.svc.phase === "ready" ? "Connected"
     : root.svc.phase === "connecting" ? "Connecting…"
@@ -52,7 +62,7 @@ Item {
   function open(payloadJson) {
     root.opened = true
     if (root.svc && !root.svc.configured) root.settingsOpen = true
-    if (root.svc) root.pickedAgent = root.svc.agentId
+    if (root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity }
     root.focusInput()
   }
 
@@ -78,6 +88,18 @@ Item {
     })
   }
 
+  // Transcribed speech lands in the box rather than being sent straight off:
+  // you get to see what was heard, which matters most in exactly the languages
+  // where it is hardest to hear.
+  Connections {
+    target: root.svc
+    ignoreUnknownSignals: true
+    function onTranscribed(text) {
+      input.text = text
+      root.focusInput()
+    }
+  }
+
   function sendCurrent() {
     if (!root.svc) return
     var line = input.text
@@ -98,6 +120,7 @@ Item {
     root.svc.applyConfig({
       baseUrl: urlField.text.trim(),
       agentId: root.pickedAgent,
+      sttEntity: root.pickedStt,
       languages: langs.length ? langs : ["en"]
     })
     // A language that just disappeared from the list must not stay selected.
@@ -281,7 +304,7 @@ Item {
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: {
-                  if (!root.settingsOpen && root.svc) root.pickedAgent = root.svc.agentId
+                  if (!root.settingsOpen && root.svc) { root.pickedAgent = root.svc.agentId; root.pickedStt = root.svc.sttEntity }
                   root.settingsOpen = !root.settingsOpen
                   root.focusInput()
                 }
@@ -396,6 +419,53 @@ Item {
               font.pixelSize: Style.font.body
               wrapMode: Text.Wrap
               width: parent.width
+            }
+
+            Text {
+              text: "Speaking (optional — which engine transcribes you)"
+              color: root.foreground
+              opacity: 0.7
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body
+            }
+
+            Flow {
+              width: parent.width
+              spacing: Style.spacing.sm
+              visible: root.svc && root.svc.sttEngines.length > 0
+
+              Repeater {
+                model: root.svc ? [{id: "", name: "Off"}].concat(root.svc.sttEngines) : []
+
+                Rectangle {
+                  required property var modelData
+                  readonly property bool picked: root.pickedStt === modelData.id
+
+                  width: sttChipText.implicitWidth + Style.spacing.controlPaddingX * 2
+                  height: Style.space(30)
+                  radius: root.cornerRadius
+                  color: picked ? root.accent : (sttChipArea.containsMouse ? root.bubbleBackground : "transparent")
+                  border.width: picked ? 0 : 1
+                  border.color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.25)
+
+                  Text {
+                    id: sttChipText
+                    anchors.centerIn: parent
+                    text: modelData.name
+                    color: parent.picked ? root.background : root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  MouseArea {
+                    id: sttChipArea
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: root.pickedStt = modelData.id
+                  }
+                }
+              }
             }
 
             Text {
@@ -536,14 +606,59 @@ Item {
 
               TextField {
                 id: input
-                anchors.left: parent.left
+                anchors.left: micButton.visible ? micButton.right : parent.left
+                anchors.leftMargin: micButton.visible ? Style.spacing.sm : 0
                 anchors.right: sendButton.left
                 anchors.rightMargin: Style.spacing.sm
                 anchors.verticalCenter: parent.verticalCenter
-                placeholderText: root.svc && root.svc.busy ? "Waiting for the answer…" : "Message your house…"
-                enabled: !(root.svc && root.svc.busy)
+                placeholderText: root.micHint
+                enabled: !(root.svc && (root.svc.busy || root.svc.recording || root.svc.transcribing))
                 onAccepted: root.sendCurrent()
                 Keys.onEscapePressed: root.dismiss()
+              }
+
+              // Speak instead of typing. Home Assistant transcribes, so what
+              // comes back lands in the box for you to read before it is sent —
+              // which is also the only honest way to judge how well your
+              // language is being heard.
+              Rectangle {
+                id: micButton
+                width: Style.space(40)
+                height: input.height
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                radius: root.cornerRadius
+                visible: root.svc && root.svc.canListen
+                color: (root.svc && root.svc.recording) ? root.accent
+                     : (micArea.containsMouse ? root.accent : root.bubbleBackground)
+
+                Text {
+                  anchors.centerIn: parent
+                  text: (root.svc && root.svc.transcribing) ? "…" : "🎙"
+                  color: (root.svc && root.svc.recording) || micArea.containsMouse
+                    ? root.background : root.foreground
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.body
+                }
+
+                SequentialAnimation on opacity {
+                  running: root.svc && root.svc.recording
+                  loops: Animation.Infinite
+                  NumberAnimation { from: 1.0; to: 0.45; duration: 600 }
+                  NumberAnimation { from: 0.45; to: 1.0; duration: 600 }
+                }
+
+                MouseArea {
+                  id: micArea
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: {
+                    if (!root.svc) return
+                    if (root.svc.recording) root.svc.stopListening()
+                    else if (!root.svc.transcribing) root.svc.startListening()
+                  }
+                }
               }
 
               Rectangle {

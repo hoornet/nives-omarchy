@@ -48,13 +48,14 @@ Item {
   }
 
   function parseConfig(text) {
-    var out = { baseUrl: "", agentId: "", languages: ["en"] }
+    var out = { baseUrl: "", agentId: "", sttEntity: "", languages: ["en"] }
     if (!text) return out
     try {
       var parsed = JSON.parse(text)
       if (parsed && typeof parsed === "object") {
         if (typeof parsed.baseUrl === "string") out.baseUrl = parsed.baseUrl
         if (typeof parsed.agentId === "string") out.agentId = parsed.agentId
+        if (typeof parsed.sttEntity === "string") out.sttEntity = parsed.sttEntity
         if (Array.isArray(parsed.languages)) {
           var clean = []
           for (var i = 0; i < parsed.languages.length; i++) {
@@ -74,6 +75,7 @@ Item {
     var next = {
       baseUrl: root.config.baseUrl,
       agentId: root.config.agentId,
+      sttEntity: root.config.sttEntity,
       languages: root.config.languages
     }
     for (var key in patch) next[key] = patch[key]
@@ -194,6 +196,13 @@ Item {
   // talking to the built-in intent matcher without realising it.
   property var agents: []
 
+  // Speech-to-text engines the house exposes. Home Assistant does the
+  // transcribing — whichever engine is picked here — so this plugin never
+  // needs a transcription key or a model of its own.
+  property var sttEngines: []
+  readonly property string sttEntity: String(config.sttEntity || "")
+  readonly property bool canListen: root.ready && root.sttEntity !== ""
+
   readonly property string agentName: {
     for (var i = 0; i < root.agents.length; i++)
       if (root.agents[i].id === root.agentId) return root.agents[i].name
@@ -210,18 +219,21 @@ Item {
       if (xhr.readyState !== XMLHttpRequest.DONE) return
       if (xhr.status < 200 || xhr.status >= 300) return
       var found = []
+      var engines = []
       try {
         var states = JSON.parse(xhr.responseText || "[]")
         for (var i = 0; i < states.length; i++) {
           var id = String(states[i].entity_id || "")
-          if (id.indexOf("conversation.") !== 0) continue
           var attrs = states[i].attributes || {}
-          found.push({ id: id, name: String(attrs.friendly_name || id) })
+          var entry = { id: id, name: String(attrs.friendly_name || id) }
+          if (id.indexOf("conversation.") === 0) found.push(entry)
+          else if (id.indexOf("stt.") === 0) engines.push(entry)
         }
       } catch (e) {
         return
       }
       root.agents = found
+      root.sttEngines = engines
     }
     xhr.send()
   }
@@ -246,6 +258,136 @@ Item {
       }
     }
     xhr.send()
+  }
+
+  // --- speaking -----------------------------------------------------------
+  //
+  // Capture goes to headerless PCM at the one format Assist speaks — 16 kHz,
+  // mono, 16-bit — so it can be handed to Home Assistant's speech-to-text API
+  // exactly as recorded, with no conversion step in between. Home Assistant
+  // owns the transcription; we only carry bytes.
+
+  readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
+  readonly property string audioPath: runtimeDir + "/nives-omarchy-speech.raw"
+  readonly property string headerPath: runtimeDir + "/nives-omarchy-auth.header"
+
+  property bool recording: false
+  property bool transcribing: false
+  property string listenError: ""
+
+  signal transcribed(string text)
+
+  // A spoken request is seconds long. This is not a quality limit, it is a
+  // stuck-button limit: without it a forgotten recording runs until the disk
+  // or the patience gives out.
+  readonly property int maxRecordSeconds: 60
+
+  function startListening() {
+    if (root.recording || root.transcribing || !root.canListen) return
+    root.listenError = ""
+    // The header file is what keeps the token out of argv — every process on
+    // the machine can read /proc/<pid>/cmdline, and XDG_RUNTIME_DIR is the one
+    // directory that is already private to this user.
+    authHeaderFile.setText("Authorization: Bearer " + root.token + "\n")
+    recordProcess.command = [
+      "pw-record", "--rate", "16000", "--channels", "1",
+      "--format", "s16", "--container", "raw", root.audioPath
+    ]
+    recordProcess.running = true
+    root.recording = true
+    recordLimit.restart()
+  }
+
+  function stopListening() {
+    if (!root.recording) return
+    recordLimit.stop()
+    root.recording = false
+    // SIGINT, not SIGKILL: pw-record flushes what it has captured on the way
+    // out, and a killed recorder loses the tail of the sentence.
+    if (recordProcess.running) recordProcess.signal(2)
+    else root.transcribeRecording()
+  }
+
+  function cancelListening() {
+    recordLimit.stop()
+    root.recording = false
+    root.transcribing = false
+    if (recordProcess.running) recordProcess.signal(2)
+  }
+
+  function transcribeRecording() {
+    if (!root.canListen) return
+    root.transcribing = true
+    sttOutput = ""
+    sttProcess.command = [
+      "curl", "-sS", "--max-time", "90",
+      "-H", "@" + root.headerPath,
+      "-H", "X-Speech-Content: format=wav; codec=pcm; sample_rate=16000; "
+            + "bit_rate=16; channel=1; language=" + root.activeLanguage,
+      "--data-binary", "@" + root.audioPath,
+      root.baseUrl + "/api/stt/" + root.sttEntity
+    ]
+    sttProcess.running = true
+  }
+
+  property string sttOutput: ""
+
+  property Timer recordLimit: Timer {
+    interval: root.maxRecordSeconds * 1000
+    onTriggered: root.stopListening()
+  }
+
+  property Process recordProcess: Process {
+    command: []
+    onExited: function(exitCode) {
+      // Interrupting the recorder ourselves is the normal path, so a non-zero
+      // exit only matters when we never asked it to stop.
+      if (root.recording) {
+        root.recording = false
+        root.listenError = "Recording stopped unexpectedly — is a microphone connected?"
+        return
+      }
+      root.transcribeRecording()
+    }
+  }
+
+  property Process sttProcess: Process {
+    command: []
+    stdout: SplitParser {
+      onRead: function(line) { root.sttOutput += String(line || "") }
+    }
+    onExited: function(exitCode) {
+      root.transcribing = false
+      var raw = root.sttOutput
+      root.sttOutput = ""
+      if (exitCode !== 0) {
+        root.listenError = "Could not reach Home Assistant to transcribe."
+        return
+      }
+      var data = null
+      try { data = JSON.parse(raw || "null") } catch (e) {}
+      if (!data || typeof data !== "object") {
+        root.listenError = "Home Assistant sent back something unreadable."
+        return
+      }
+      if (data.result !== "success") {
+        root.listenError = "Home Assistant could not make out what was said."
+        return
+      }
+      var text = String(data.text || "").trim()
+      if (!text) {
+        root.listenError = "Nothing was said."
+        return
+      }
+      root.listenError = ""
+      root.transcribed(text)
+    }
+  }
+
+  property FileView authHeaderFile: FileView {
+    path: root.headerPath
+    printErrors: false
+    atomicWrites: true
   }
 
   // --- credentials --------------------------------------------------------

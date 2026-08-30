@@ -65,6 +65,22 @@ Optionally, add it to the Omarchy menu in
    switches — so you always know, rather than guessing from the reply.
 4. **Save & connect.** Ask your house something.
 
+### Speaking instead of typing
+
+If your Home Assistant has a speech-to-text engine — a local one, or Nives's own
+when you switch on Transcription in the add-on — pick it under **Speaking** in
+settings and a microphone button appears next to the message box. Click it,
+say your piece, click again.
+
+What you said lands **in the message box rather than being sent**, so you can
+read it back before pressing Enter. That is deliberate: transcription of
+smaller languages is the least reliable part of the whole chain, and seeing the
+words is how you know whether to trust them.
+
+Recording uses `pw-record` (part of PipeWire, already on Omarchy) at 16 kHz mono
+— exactly the format Assist expects — and Home Assistant does the transcribing,
+so this plugin never handles a transcription key or model of its own.
+
 ### Which language am I in?
 
 The header shows a language chip — `EN`, `SL` — for the language the plugin
