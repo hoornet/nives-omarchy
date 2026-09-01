@@ -5,6 +5,10 @@ Omarchy desktop. Press a key, type a sentence, get an answer:
 
 > *"Turn off everything downstairs and remind me why the boiler alert fired."*
 
+![Speaking to the house from the Omarchy desktop: the panel clears, listens, and answers out loud](demo.gif)
+
+*Spoken to, answering back. The reply is also read aloud, which a GIF cannot show.*
+
 This plugin is a chat overlay for **any Home Assistant Assist conversation
 agent**. It shines brightest with an AI agent on the other end — such as
 [Nives](https://nives.house) (a paid, one-click Home Assistant add-on) or
