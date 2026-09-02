@@ -107,6 +107,30 @@ and Home Assistant does the thinking, transcribing and speaking.
    switches — so you always know, rather than guessing from the reply.
 4. **Save & connect.** Ask your house something.
 
+#### Which addresses are accepted, and why
+
+Every request carries your long-lived token, and the body carries whatever you
+say to the house. Over plain `http://` both cross the network unencrypted, so
+the address is checked before anything is sent:
+
+| Address | Accepted |
+|---|---|
+| `https://` anything | Yes. Nabu Casa, a reverse proxy, Tailscale, a LAN certificate |
+| `http://` to a private address | Yes. `192.168.x`, `10.x`, `172.16-31.x`, `127.0.0.1`, `[::1]` |
+| `http://` to `.local`, `.lan`, or a bare name | Yes. `homeassistant.local`, `homeassistant` |
+| `http://` to a public address or domain | **No.** Use `https://` for it |
+
+The only setup this refuses is Home Assistant reachable over plain HTTP from
+outside your own network, where the token would be readable in transit by
+anyone on the path. If that is your setup, put it behind HTTPS. Nothing that
+works on a normal LAN is affected.
+
+**Speaking needs `XDG_RUNTIME_DIR`.** Recording writes the audio, and the token
+that uploads it, into a private per-session directory. Any normal desktop login
+sets that variable. Without it the plugin leaves voice switched off and says so,
+rather than putting your token somewhere shared like `/tmp`, where another
+account on the machine could read it.
+
 ### Speaking instead of typing
 
 If your Home Assistant has a speech-to-text engine — a local one, or Nives's own

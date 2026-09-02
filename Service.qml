@@ -24,7 +24,7 @@ Item {
   property var config: parseConfig("")
   readonly property string baseUrl: normalizeOrigin(config.baseUrl)
   readonly property string agentId: String(config.agentId || "")
-  readonly property bool configured: baseUrl !== ""
+  readonly property bool configured: baseUrl !== "" && endpointAllowed
 
   // Languages offered in the header switch. Home Assistant is told which one
   // each message is in, so a bilingual house can stop guessing: the reply comes
@@ -54,6 +54,55 @@ Item {
     if (!/^https?:\/\//i.test(url)) url = "http://" + url
     return url.replace(/\/+$/, "")
   }
+
+  // --- where plain HTTP is acceptable -------------------------------------
+  //
+  // Every request carries a long-lived Bearer token that can open your front
+  // door, and the body carries whatever was said in the house. Over http://
+  // both cross the network in the clear. So http:// is allowed only to an
+  // address that cannot leave the building, and https:// is allowed anywhere,
+  // which is what keeps Tailscale, a reverse proxy and Nabu Casa working
+  // exactly as before. The one setup this refuses is Home Assistant exposed to
+  // the internet over plain HTTP, which should be refused.
+
+  function hostOf(url) {
+    var m = /^https?:\/\/([^\/?#]+)/i.exec(String(url || ""))
+    if (!m) return ""
+    var host = m[1]
+    var at = host.lastIndexOf("@")            // strip any user:pass@
+    if (at >= 0) host = host.slice(at + 1)
+    if (host.charAt(0) === "[") {             // [::1]:8123
+      var end = host.indexOf("]")
+      return end > 0 ? host.slice(1, end).toLowerCase() : ""
+    }
+    var colon = host.indexOf(":")
+    if (colon >= 0) host = host.slice(0, colon)
+    return host.toLowerCase()
+  }
+
+  function isLocalHost(host) {
+    var h = String(host || "")
+    if (!h) return false
+    if (h === "localhost" || h === "::1") return true
+    if (/^127\./.test(h)) return true                          // loopback
+    if (/^10\./.test(h)) return true                           // RFC1918
+    if (/^192\.168\./.test(h)) return true                     // RFC1918
+    if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(h)) return true   // RFC1918
+    if (/^169\.254\./.test(h)) return true                     // link-local
+    if (/^fe[89ab][0-9a-f]:/i.test(h)) return true             // IPv6 link-local
+    if (/^f[cd][0-9a-f]{2}:/i.test(h)) return true             // IPv6 unique-local
+    if (/\.(local|lan|home|internal|localdomain)$/.test(h)) return true
+    if (h.indexOf(".") < 0) return true                        // bare LAN name
+    return false
+  }
+
+  readonly property bool endpointSecure: /^https:\/\//i.test(root.baseUrl)
+  readonly property bool endpointAllowed: root.baseUrl === ""
+    || root.endpointSecure
+    || root.isLocalHost(root.hostOf(root.baseUrl))
+  readonly property string endpointProblem: root.endpointAllowed ? ""
+    : "Refusing to send your token unencrypted to " + root.hostOf(root.baseUrl)
+      + ". That address is outside your own network, so use https:// for it."
 
   function parseConfig(text) {
     var out = { baseUrl: "", agentId: "", sttEntity: "", micSource: "", languages: ["en"],
@@ -161,6 +210,7 @@ Item {
 
     root.transcript.append({ role: "user", text: line, pending: false, error: false })
     root.transcript.append({ role: "assistant", text: "", pending: true, error: false })
+    root.trimTranscript()
     root.busy = true
 
     var speakIt = root.pendingSpeak
@@ -186,7 +236,9 @@ Item {
         return
       }
       var data = null
-      try { data = JSON.parse(xhr.responseText || "null") } catch (e) {}
+      if (root.bodyWithinLimit(xhr.responseText)) {
+        try { data = JSON.parse(xhr.responseText || "null") } catch (e) {}
+      }
       if (!data) {
         root.resolveReply("Home Assistant sent back something that isn't JSON.", true)
         return
@@ -234,7 +286,7 @@ Item {
   // needs a transcription key or a model of its own.
   property var sttEngines: []
   readonly property string sttEntity: String(config.sttEntity || "")
-  readonly property bool canListen: root.ready && root.sttEntity !== ""
+  readonly property bool canListen: root.ready && root.sttEntity !== "" && root.runtimePrivate
 
   readonly property string agentName: {
     for (var i = 0; i < root.agents.length; i++)
@@ -255,8 +307,10 @@ Item {
       var engines = []
       var voices = []
       try {
+        if (!root.bodyWithinLimit(xhr.responseText)) return
         var states = JSON.parse(xhr.responseText || "[]")
-        for (var i = 0; i < states.length; i++) {
+        var cap = Math.min(states.length, root.maxEntities)
+        for (var i = 0; i < cap; i++) {
           var id = String(states[i].entity_id || "")
           var attrs = states[i].attributes || {}
           var entry = { id: id, name: String(attrs.friendly_name || id) }
@@ -304,9 +358,35 @@ Item {
   // exactly as recorded, with no conversion step in between. Home Assistant
   // owns the transcription; we only carry bytes.
 
-  readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || "/tmp"
-  readonly property string audioPath: runtimeDir + "/nives-omarchy-speech.raw"
-  readonly property string headerPath: runtimeDir + "/nives-omarchy-auth.header"
+  // There is deliberately no fallback to /tmp. The header file below holds a
+  // Bearer token that grants full control of the house, and /tmp is shared and
+  // world-writable: anyone with a login could read that token, or plant a
+  // symlink at a name they can predict and have us write it somewhere else.
+  // XDG_RUNTIME_DIR is owner-only, mode 700, and cleaned up with the session.
+  // If it is missing, the voice features stay switched off rather than writing
+  // the token to a place that cannot hold it safely.
+  readonly property string runtimeBase: Quickshell.env("XDG_RUNTIME_DIR") || ""
+  readonly property string runtimeDir: runtimeBase ? runtimeBase + "/nives-omarchy" : ""
+  readonly property string audioPath: runtimeDir + "/speech.raw"
+  readonly property string headerPath: runtimeDir + "/auth.header"
+
+  // Set once the directory has been proved to exist, be a directory rather
+  // than a link, and be owned by us. Voice waits for that proof.
+  property bool runtimePrivate: false
+  readonly property string runtimeProblem: runtimeBase === ""
+    ? "Voice is off: XDG_RUNTIME_DIR is not set, and this plugin will not put your token in a shared directory."
+    : (root.runtimePrivate ? "" : "Voice is off: could not create a private directory for the session.")
+
+  Component.onCompleted: if (root.runtimeDir) runtimeDirProcess.running = true
+
+  property Process runtimeDirProcess: Process {
+    // -m 700 on create, then prove it: a directory, not a symlink, owned by us.
+    // umask keeps the files we write inside it owner-only too.
+    command: ["sh", "-c",
+      "umask 077; mkdir -p -m 700 \"$1\" && [ -d \"$1\" ] && [ ! -L \"$1\" ] && [ -O \"$1\" ]",
+      "sh", root.runtimeDir]
+    onExited: function(exitCode) { root.runtimePrivate = (exitCode === 0) }
+  }
 
   property bool recording: false
   property bool transcribing: false
@@ -319,6 +399,26 @@ Item {
   // or the patience gives out.
   readonly property int maxRecordSeconds: 60
 
+  // Everything below arrives from the network or from a subprocess, so none of
+  // it is ours to trust the size of. A house with thousands of entities, a
+  // wedged curl, or a reply that never ends should cost a truncated result,
+  // not the shell's memory.
+  readonly property int maxBodyChars: 4000000     // ~4 MB of JSON
+  readonly property int maxProcessChars: 1000000  // ~1 MB from a subprocess
+  readonly property int maxTranscriptRows: 200
+  readonly property int maxSpokenChars: 4000
+  readonly property int maxEntities: 1000
+
+  // Keep the transcript from growing without limit across a long session.
+  function trimTranscript() {
+    while (root.transcript.count > root.maxTranscriptRows) root.transcript.remove(0)
+  }
+
+  // A body we refuse to parse rather than one we parse and regret.
+  function bodyWithinLimit(text) {
+    return String(text || "").length <= root.maxBodyChars
+  }
+
   // Which microphone to record from. Left empty this follows the system
   // default, which is convenient right up until a Bluetooth headset connects
   // and quietly becomes the default — recording your sentence through a
@@ -328,16 +428,27 @@ Item {
 
   function loadMicSources() {
     micListProcess.running = true
+    micListLimit.restart()
   }
 
   property string micListOutput: ""
 
+  // pactl talks to the sound server, and a wedged sound server does not answer.
+  property Timer micListLimit: Timer {
+    interval: 15000
+    onTriggered: if (micListProcess.running) micListProcess.signal(9)
+  }
+
   property Process micListProcess: Process {
     command: ["pactl", "-f", "json", "list", "sources"]
     stdout: SplitParser {
-      onRead: function(line) { root.micListOutput += String(line || "") }
+      onRead: function(line) {
+        if (root.micListOutput.length > root.maxProcessChars) return
+        root.micListOutput += String(line || "")
+      }
     }
     onExited: function(exitCode) {
+      micListLimit.stop()
       var raw = root.micListOutput
       root.micListOutput = ""
       if (exitCode !== 0) return
@@ -380,7 +491,7 @@ Item {
     root.recording = false
     // SIGINT, not SIGKILL: pw-record flushes what it has captured on the way
     // out, and a killed recorder loses the tail of the sentence.
-    if (recordProcess.running) recordProcess.signal(2)
+    if (recordProcess.running) { recordProcess.signal(2); recordStopLimit.restart() }
     else root.transcribeRecording()
   }
 
@@ -388,7 +499,7 @@ Item {
     recordLimit.stop()
     root.recording = false
     root.transcribing = false
-    if (recordProcess.running) recordProcess.signal(2)
+    if (recordProcess.running) { recordProcess.signal(2); recordStopLimit.restart() }
   }
 
   function transcribeRecording() {
@@ -404,6 +515,14 @@ Item {
       root.baseUrl + "/api/stt/" + root.sttEntity
     ]
     sttProcess.running = true
+    sttLimit.restart()
+  }
+
+  // curl carries --max-time, but that only bounds the transfer. This bounds
+  // the process, for the cases where it never gets as far as transferring.
+  property Timer sttLimit: Timer {
+    interval: 120000
+    onTriggered: if (sttProcess.running) sttProcess.signal(9)
   }
 
   property string sttOutput: ""
@@ -413,9 +532,18 @@ Item {
     onTriggered: root.stopListening()
   }
 
+  // SIGINT lets pw-record flush the tail of the sentence, which is why it is
+  // the first ask. A recorder still running well after that is not flushing,
+  // so it gets SIGKILL rather than being left holding the microphone.
+  property Timer recordStopLimit: Timer {
+    interval: 5000
+    onTriggered: if (recordProcess.running) recordProcess.signal(9)
+  }
+
   property Process recordProcess: Process {
     command: []
     onExited: function(exitCode) {
+      recordStopLimit.stop()
       // Interrupting the recorder ourselves is the normal path, so a non-zero
       // exit only matters when we never asked it to stop.
       if (root.recording) {
@@ -430,9 +558,13 @@ Item {
   property Process sttProcess: Process {
     command: []
     stdout: SplitParser {
-      onRead: function(line) { root.sttOutput += String(line || "") }
+      onRead: function(line) {
+        if (root.sttOutput.length > root.maxProcessChars) return
+        root.sttOutput += String(line || "")
+      }
     }
     onExited: function(exitCode) {
+      sttLimit.stop()
       root.transcribing = false
       var raw = root.sttOutput
       root.sttOutput = ""
@@ -498,7 +630,7 @@ Item {
   }
 
   function speak(text) {
-    var line = String(text || "").trim()
+    var line = String(text || "").trim().slice(0, root.maxSpokenChars)
     if (!line || !root.canSpeak) return
     var xhr = new XMLHttpRequest()
     xhr.open("POST", root.baseUrl + "/api/tts_get_url")
@@ -510,7 +642,16 @@ Item {
       if (xhr.status < 200 || xhr.status >= 300) return
       var url = ""
       try { url = String((JSON.parse(xhr.responseText || "{}") || {}).url || "") } catch (e) {}
-      if (url) root.playUrl(url)
+      if (!url) return
+      // The player is a media engine that speaks dozens of protocols, so the
+      // URL it is handed decides what it connects to. This one arrives over
+      // the network, and it is only ever meant to point back at the house we
+      // are already talking to, so anything else is refused rather than played.
+      if (!root.playbackAllowed(url)) {
+        root.listenError = "Refused to play audio from an unexpected address."
+        return
+      }
+      root.playUrl(url)
     }
     xhr.send(JSON.stringify({
       engine_id: root.ttsEntity,
@@ -519,24 +660,52 @@ Item {
     }))
   }
 
+  // http(s) only, and only back to the house we are already talking to. Both
+  // halves matter: the scheme keeps the player off protocols we never intended
+  // to hand it, and the host keeps a redirected or substituted URL from
+  // turning a spoken reply into a fetch of somewhere else entirely.
+  function playbackAllowed(url) {
+    var u = String(url || "")
+    if (!/^https?:\/\//i.test(u)) return false
+    var host = root.hostOf(u)
+    return host !== "" && host === root.hostOf(root.baseUrl)
+  }
+
   function playUrl(url) {
+    if (!root.playbackAllowed(url)) return
     root.stopSpeaking()
+    // --no-config so a stray ~/.config/mpv cannot reinterpret any of this, and
+    // a network timeout so a stalled fetch cannot hold the player open.
     var cmd = root.player.indexOf("mpv") >= 0
-      ? [root.player, "--no-video", "--really-quiet", url]
-      : [root.player, "-nodisp", "-autoexit", "-loglevel", "quiet", url]
+      ? [root.player, "--no-config", "--no-video", "--really-quiet",
+         "--network-timeout=30", url]
+      : [root.player, "-nodisp", "-autoexit", "-loglevel", "quiet",
+         "-rw_timeout", "30000000", url]
     playProcess.command = cmd
     playProcess.running = true
     root.speaking = true
+    playLimit.restart()
   }
 
   function stopSpeaking() {
+    playLimit.stop()
     if (playProcess.running) playProcess.signal(15)
     root.speaking = false
   }
 
+  // A spoken reply is seconds long. If the player is still going well past
+  // any plausible answer it is stuck on a stalled stream, not talking.
+  property Timer playLimit: Timer {
+    interval: 300000
+    onTriggered: {
+      if (playProcess.running) playProcess.signal(9)
+      root.speaking = false
+    }
+  }
+
   property Process playProcess: Process {
     command: []
-    onExited: function(exitCode) { root.speaking = false }
+    onExited: function(exitCode) { playLimit.stop(); root.speaking = false }
   }
 
   // --- credentials --------------------------------------------------------

@@ -64,10 +64,16 @@ Item {
     if (root.svc.transcribing) return Strings.t(root.uiLang, "transcribing")
     if (root.svc.busy) return Strings.t(root.uiLang, "waiting")
     if (root.svc.listenError) return root.svc.listenError
+    // Voice switched itself off for a reason the user cannot otherwise see.
+    if (root.svc.runtimeProblem) return root.svc.runtimeProblem
     return Strings.t(root.uiLang, "inputPlaceholder")
   }
 
+  // A refused endpoint outranks every other status: nothing else about the
+  // connection matters while we are declining to use it, and "not configured"
+  // would send someone back to re-type an address that is already correct.
   readonly property string statusText: !root.svc ? Strings.t(root.uiLang, "serviceMissing")
+    : root.svc.endpointProblem ? root.svc.endpointProblem
     : root.svc.phase === "ready" ? Strings.t(root.uiLang, "connected")
     : root.svc.phase === "connecting" ? Strings.t(root.uiLang, "connecting")
     : root.svc.phase === "error" ? root.svc.lastError

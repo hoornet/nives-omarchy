@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.hoornet.nives",
   "name": "Nives for Omarchy",
-  "version": "0.8.1",
-  "author": "Jure Sršen (hoornet)",
+  "version": "0.9.0",
+  "author": "Jure Sr\u0161en (hoornet)",
   "license": "MIT",
-  "description": "Talk to your Home Assistant house in plain language. A chat overlay for any Assist conversation agent — ask questions, control devices, create automations.",
+  "description": "Talk to your Home Assistant house in plain language. A chat overlay for any Assist conversation agent \u2014 ask questions, control devices, create automations.",
   "kinds": [
     "service",
     "bar-widget",
