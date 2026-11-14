@@ -11,7 +11,7 @@ Omarchy desktop. Press a key, type a sentence, get an answer:
 
 This plugin is a chat overlay for **any Home Assistant Assist conversation
 agent**. It shines brightest with an AI agent on the other end — such as
-[Nives](https://nives.house) (a paid, one-click Home Assistant add-on) or
+[Nives](https://github.com/hoornet/nives) (a one-click Home Assistant add-on) or
 [home-mind](https://github.com/hoornet/home-mind) (its open-source sister
 project) — which add memory, natural conversation, and the ability to create
 automations by describing them. But it works with the built-in Assist agent
