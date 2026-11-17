@@ -51,7 +51,11 @@ Item {
   function normalizeOrigin(raw) {
     var url = String(raw || "").trim()
     if (!url) return ""
-    if (!/^https?:\/\//i.test(url)) url = "http://" + url
+    // No scheme typed: plain HTTP only for an address that cannot leave the
+    // building, HTTPS for anything else. Defaulting a public name to http://
+    // would turn a typo into a request the endpoint policy below refuses.
+    if (!/^https?:\/\//i.test(url))
+      url = (root.isLocalHost(root.hostOf("http://" + url)) ? "http://" : "https://") + url
     return url.replace(/\/+$/, "")
   }
 
@@ -295,7 +299,9 @@ Item {
   }
 
   function loadAgents() {
-    if (!root.baseUrl || !root.token) return
+    // `configured` includes the endpoint policy: no token goes to an address
+    // that policy refuses, whichever path asks.
+    if (!root.configured || !root.token) return
     var xhr = new XMLHttpRequest()
     xhr.open("GET", root.baseUrl + "/api/states")
     xhr.setRequestHeader("Authorization", "Bearer " + root.token)
@@ -332,6 +338,13 @@ Item {
   // say "connected" before the first message is ever sent.
   function checkConnection() {
     if (!root.baseUrl || !root.token) return
+    // The token arrives from the keyring for whatever address is saved, so the
+    // endpoint policy is checked here too, not only in send(): a probe to a
+    // public plain-HTTP address would carry the token in the clear.
+    if (!root.configured) {
+      root.fail(root.endpointProblem)
+      return
+    }
     root.phase = "connecting"
     var xhr = new XMLHttpRequest()
     xhr.open("GET", root.baseUrl + "/api/")
